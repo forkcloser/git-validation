@@ -1,13 +1,11 @@
 # git-validation
 
 A way to do validation on git commits.
-[![Travis Status](https://travis-ci.org/vbatts/git-validation.svg?branch=master)](https://travis-ci.org/vbatts/git-validation)
-[![GithubActions Status](https://github.com/vbatts/git-validation/actions/workflows/go.yml/badge.svg)](https://github.com/vbatts/git-validation/actions/workflows/go.yml)
 
 ## install
 
 ```shell
-go install github.com/vbatts/git-validation@latest
+go install github.com/forkcloser/git-validation@latest
 ```
 
 ## usage

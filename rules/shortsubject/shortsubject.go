@@ -3,19 +3,17 @@ package shortsubject
 import (
 	"strings"
 
-	"github.com/vbatts/git-validation/git"
-	"github.com/vbatts/git-validation/validate"
+	"github.com/forkcloser/git-validation/git"
+	"github.com/forkcloser/git-validation/validate"
 )
 
-var (
-	// ShortSubjectRule is the rule being registered
-	ShortSubjectRule = validate.Rule{
-		Name:        "short-subject",
-		Description: "commit subjects are strictly less than 90 (github ellipsis length)",
-		Run:         ValidateShortSubject,
-		Default:     true,
-	}
-)
+// ShortSubjectRule is the rule being registered
+var ShortSubjectRule = validate.Rule{
+	Name:        "short-subject",
+	Description: "commit subjects are strictly less than 90 (github ellipsis length)",
+	Run:         ValidateShortSubject,
+	Default:     true,
+}
 
 func init() {
 	validate.RegisterRule(ShortSubjectRule)
@@ -32,7 +30,7 @@ func ValidateShortSubject(r validate.Rule, c git.CommitEntry) (vr validate.Resul
 	if len(c["subject"]) >= 90 {
 		vr.Pass = false
 		vr.Msg = "commit subject exceeds 90 characters"
-		return
+		return vr
 	}
 	vr.Pass = true
 	if len(c["subject"]) > 72 {
@@ -40,5 +38,5 @@ func ValidateShortSubject(r validate.Rule, c git.CommitEntry) (vr validate.Resul
 	} else {
 		vr.Msg = "commit subject is 72 characters or less! *yay*"
 	}
-	return
+	return vr
 }

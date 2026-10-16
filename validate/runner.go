@@ -6,7 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vbatts/git-validation/git"
+
+	"github.com/forkcloser/git-validation/git"
 )
 
 // Runner is the for processing a set of rules against a range of commits

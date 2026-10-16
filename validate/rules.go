@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vbatts/git-validation/git"
+	"github.com/forkcloser/git-validation/git"
 )
 
 var (
@@ -50,7 +50,7 @@ type Result struct {
 type Results []Result
 
 // PassFail gives a quick over/under of passes and failures of the results in this set
-func (vr Results) PassFail() (pass int, fail int) {
+func (vr Results) PassFail() (pass, fail int) {
 	for _, res := range vr {
 		if res.Pass {
 			pass++
@@ -67,7 +67,7 @@ func SanitizeFilters(filtStr string) (filters []string) {
 	for _, item := range strings.Split(filtStr, ",") {
 		filters = append(filters, strings.TrimSpace(item))
 	}
-	return
+	return filters
 }
 
 // FilterRules takes a set of rules and a list of short names to include, and

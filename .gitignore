@@ -1,2 +1,8 @@
 *~
-git-validation
+/git-validation
+
+# Required by limen (book/mandatory-files.md, ".gitignore").
+/build
+/_scratch
+.claude
+.idea

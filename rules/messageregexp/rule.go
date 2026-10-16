@@ -5,23 +5,21 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/vbatts/git-validation/git"
-	"github.com/vbatts/git-validation/validate"
+	"github.com/forkcloser/git-validation/git"
+	"github.com/forkcloser/git-validation/validate"
 )
 
 func init() {
 	validate.RegisterRule(RegexpRule)
 }
 
-var (
-	// RegexpRule for validating a user provided regex on the commit messages
-	RegexpRule = validate.Rule{
-		Name:        "message_regexp",
-		Description: "checks the commit message for a user provided regular expression",
-		Run:         ValidateMessageRegexp,
-		Default:     false, // only for users specifically calling it through -run ...
-	}
-)
+// RegexpRule for validating a user provided regex on the commit messages
+var RegexpRule = validate.Rule{
+	Name:        "message_regexp",
+	Description: "checks the commit message for a user provided regular expression",
+	Run:         ValidateMessageRegexp,
+	Default:     false, // only for users specifically calling it through -run ...
+}
 
 // ValidateMessageRegexp is the message regex func to run
 func ValidateMessageRegexp(r validate.Rule, c git.CommitEntry) (vr validate.Result) {

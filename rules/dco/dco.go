@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/vbatts/git-validation/git"
-	"github.com/vbatts/git-validation/validate"
+	"github.com/forkcloser/git-validation/git"
+	"github.com/forkcloser/git-validation/validate"
 )
 
 func init() {
