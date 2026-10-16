@@ -5,16 +5,14 @@ import (
 	"github.com/forkcloser/git-validation/validate"
 )
 
-var (
-	// DanglingWhitespace is the rule for checking the presence of dangling
-	// whitespaces on line endings.
-	DanglingWhitespace = validate.Rule{
-		Name:        "dangling-whitespace",
-		Description: "checking the presence of dangling whitespaces on line endings",
-		Run:         ValidateDanglingWhitespace,
-		Default:     true,
-	}
-)
+// DanglingWhitespace is the rule for checking the presence of dangling
+// whitespaces on line endings.
+var DanglingWhitespace = validate.Rule{
+	Name:        "dangling-whitespace",
+	Description: "checking the presence of dangling whitespaces on line endings",
+	Run:         ValidateDanglingWhitespace,
+	Default:     true,
+}
 
 func init() {
 	validate.RegisterRule(DanglingWhitespace)
@@ -35,5 +33,5 @@ func ValidateDanglingWhitespace(r validate.Rule, c git.CommitEntry) (vr validate
 			vr.Msg = "errored with: " + err.Error()
 		}
 	}
-	return
+	return vr
 }

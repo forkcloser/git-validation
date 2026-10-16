@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
+
 	"github.com/forkcloser/git-validation/git"
 )
 

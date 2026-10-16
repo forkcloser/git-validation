@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+
 	_ "github.com/forkcloser/git-validation/rules/danglingwhitespace"
 	_ "github.com/forkcloser/git-validation/rules/dco"
 	_ "github.com/forkcloser/git-validation/rules/messageregexp"
@@ -15,16 +16,24 @@ import (
 )
 
 var (
-	flCommitRange  = flag.String("range", "", "use this commit range instead (implies -no-travis)")
-	flListRules    = flag.Bool("list-rules", false, "list the rules registered")
-	flRun          = flag.String("run", "", "comma delimited list of rules to run. Defaults to all.")
-	flVerbose      = flag.Bool("v", false, "verbose")
-	flDebug        = flag.Bool("D", false, "debug output")
-	flQuiet        = flag.Bool("q", false, "less output")
-	flDir          = flag.String("d", ".", "git directory to validate from")
-	flNoGithub     = flag.Bool("no-github", false, "disables Github Actions environment checks (when env GITHUB_ACTIONS=true is set)")
+	flCommitRange = flag.String("range", "", "use this commit range instead (implies -no-travis)")
+	flListRules   = flag.Bool("list-rules", false, "list the rules registered")
+	flRun         = flag.String("run", "", "comma delimited list of rules to run. Defaults to all.")
+	flVerbose     = flag.Bool("v", false, "verbose")
+	flDebug       = flag.Bool("D", false, "debug output")
+	flQuiet       = flag.Bool("q", false, "less output")
+	flDir         = flag.String("d", ".", "git directory to validate from")
+	flNoGithub    = flag.Bool(
+		"no-github",
+		false,
+		"disables Github Actions environment checks (when env GITHUB_ACTIONS=true is set)",
+	)
 	flNoTravis     = flag.Bool("no-travis", false, "disables travis environment checks (when env TRAVIS=true is set)")
-	flTravisPROnly = flag.Bool("travis-pr-only", true, "when on travis, only run validations if the CI-Build is checking pull-request build")
+	flTravisPROnly = flag.Bool(
+		"travis-pr-only",
+		true,
+		"when on travis, only run validations if the CI-Build is checking pull-request build",
+	)
 )
 
 func init() {
@@ -69,7 +78,7 @@ func main() {
 		logrus.Printf("%#v", rules) // XXX maybe reduce this list
 	}
 
-	var commitRange = *flCommitRange
+	commitRange := *flCommitRange
 	if commitRange == "" {
 		if strings.ToLower(os.Getenv("TRAVIS")) == "true" && !*flNoTravis {
 			if os.Getenv("TRAVIS_COMMIT_RANGE") != "" {
@@ -98,5 +107,4 @@ func main() {
 		fmt.Printf("%d commits to fix\n", fail)
 		os.Exit(1)
 	}
-
 }
