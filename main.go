@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	_ "github.com/vbatts/git-validation/rules/danglingwhitespace"
-	_ "github.com/vbatts/git-validation/rules/dco"
-	_ "github.com/vbatts/git-validation/rules/messageregexp"
-	_ "github.com/vbatts/git-validation/rules/shortsubject"
-	"github.com/vbatts/git-validation/validate"
+	_ "github.com/forkcloser/git-validation/rules/danglingwhitespace"
+	_ "github.com/forkcloser/git-validation/rules/dco"
+	_ "github.com/forkcloser/git-validation/rules/messageregexp"
+	_ "github.com/forkcloser/git-validation/rules/shortsubject"
+	"github.com/forkcloser/git-validation/validate"
 )
 
 var (

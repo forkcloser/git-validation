@@ -1,4 +1,4 @@
-module github.com/vbatts/git-validation
+module github.com/forkcloser/git-validation
 
 go 1.12
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vbatts/git-validation/git"
+	"github.com/forkcloser/git-validation/git"
 )
 
 var (
