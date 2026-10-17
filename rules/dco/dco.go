@@ -30,15 +30,18 @@ func ValidateDCO(r validate.Rule, c git.CommitEntry) (vr validate.Result) {
 	if len(strings.Split(c["parent"], " ")) > 1 {
 		vr.Pass = true
 		vr.Msg = "merge commits do not require DCO"
+
 		return vr
 	}
 
 	hasValid := false
-	for _, line := range strings.Split(c["body"], "\n") {
+
+	for line := range strings.SplitSeq(c["body"], "\n") {
 		if ValidDCO.MatchString(line) {
 			hasValid = true
 		}
 	}
+
 	if !hasValid {
 		vr.Pass = false
 		vr.Msg = "does not have a valid Developer Certificate of Origin (DCO, https://developercertificate.org); run `git commit --amend --signoff` to sign DCO"

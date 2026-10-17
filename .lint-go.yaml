@@ -75,18 +75,15 @@ golangci:
         # Counts are the measurement at enrolment, per file and linter: 239 in 10 files.
         # ---------------------------------------------------------------------------
         - path: ^cmd/git-validation/main\.go$
-          linters: # 26 findings
+          linters: # 18 findings
             - gochecknoglobals # 10
-            - wsl_v5 # 6
             - forbidigo # 3
-            - errcheck # 2
             - revive # 2
             - depguard # 1
             - gochecknoinits # 1
             - gocognit # 1
         - path: ^git/commits\.go$
-          linters: # 80 findings
-            - wsl_v5 # 36
+          linters: # 39 findings
             - wrapcheck # 11
             - noctx # 10
             - gosec # 8
@@ -94,71 +91,51 @@ golangci:
             - depguard # 2
             - gochecknoglobals # 2
             - goconst # 2
-            - modernize # 2
-            - perfsprint # 2
-            - gocritic # 1
             - revive # 1
         - path: ^git/commits_test\.go$
-          linters: # 14 findings
-            - wsl_v5 # 8
+          linters: # 4 findings
             - paralleltest # 2
             - depguard # 1
-            - govet # 1
-            - staticcheck # 1
             - testpackage # 1
         - path: ^rules/danglingwhitespace/rule\.go$
-          linters: # 6 findings
+          linters: # 5 findings
             - revive # 2
             - gochecknoglobals # 1
             - gochecknoinits # 1
             - varnamelen # 1
-            - wsl_v5 # 1
         - path: ^rules/dco/dco\.go$
-          linters: # 9 findings
-            - wsl_v5 # 3
+          linters: # 5 findings
             - revive # 2
             - gochecknoglobals # 1
             - gochecknoinits # 1
-            - modernize # 1
             - varnamelen # 1
         - path: ^rules/messageregexp/rule\.go$
-          linters: # 15 findings
-            - wsl_v5 # 7
+          linters: # 6 findings
             - varnamelen # 3
-            - modernize # 2
             - gochecknoglobals # 1
             - gochecknoinits # 1
             - revive # 1
         - path: ^rules/shortsubject/shortsubject\.go$
-          linters: # 12 findings
-            - wsl_v5 # 5
+          linters: # 7 findings
             - mnd # 2
             - revive # 2
             - gochecknoglobals # 1
             - gochecknoinits # 1
             - varnamelen # 1
         - path: ^validate/rules\.go$
-          linters: # 20 findings
-            - wsl_v5 # 10
+          linters: # 6 findings
             - varnamelen # 3
             - gochecknoglobals # 2
-            - dupword # 1
-            - gocritic # 1
-            - modernize # 1
             - revive # 1
-            - unconvert # 1
         - path: ^validate/rules_test\.go$
           linters: # 3 findings
             - paralleltest # 2
             - testpackage # 1
         - path: ^validate/runner\.go$
-          linters: # 33 findings
-            - wsl_v5 # 10
+          linters: # 18 findings
             - forbidigo # 7
             - wrapcheck # 6
-            - govet # 4
             - varnamelen # 2
             - depguard # 1
             - err113 # 1
-            - errorlint # 1
             - gocognit # 1

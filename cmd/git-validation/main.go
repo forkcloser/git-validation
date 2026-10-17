@@ -44,16 +44,22 @@ func main() {
 	flag.Parse()
 
 	if *flDebug {
-		os.Setenv("DEBUG", "1")
+		if err := os.Setenv("DEBUG", "1"); err != nil {
+			logrus.Fatal(err)
+		}
 	}
+
 	if *flQuiet {
-		os.Setenv("QUIET", "1")
+		if err := os.Setenv("QUIET", "1"); err != nil {
+			logrus.Fatal(err)
+		}
 	}
 
 	if *flListRules {
 		for _, r := range validate.RegisteredRules {
 			fmt.Printf("%q -- %s\n", r.Name, r.Description)
 		}
+
 		return
 	}
 
@@ -64,6 +70,7 @@ func main() {
 
 	// rules to be used
 	var rules []validate.Rule
+
 	for _, r := range validate.RegisteredRules {
 		// only those that are Default
 		if r.Default {
@@ -74,6 +81,7 @@ func main() {
 	if *flRun != "" {
 		rules = validate.FilterRules(validate.RegisteredRules, validate.SanitizeFilters(*flRun))
 	}
+
 	if os.Getenv("DEBUG") != "" {
 		logrus.Printf("%#v", rules) // XXX maybe reduce this list
 	}
@@ -94,6 +102,7 @@ func main() {
 	}
 
 	logrus.Infof("using commit range: %s", commitRange)
+
 	runner, err := validate.NewRunner(*flDir, rules, commitRange, *flVerbose)
 	if err != nil {
 		logrus.Fatal(err)
@@ -102,6 +111,7 @@ func main() {
 	if err := runner.Run(); err != nil {
 		logrus.Fatal(err)
 	}
+
 	_, fail := runner.Results.PassFail()
 	if fail > 0 {
 		fmt.Printf("%d commits to fix\n", fail)
