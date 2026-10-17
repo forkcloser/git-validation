@@ -18,6 +18,7 @@ var (
 func RegisterRule(vr Rule) {
 	registerRuleLock.Lock()
 	defer registerRuleLock.Unlock()
+
 	RegisteredRules = append(RegisteredRules, vr)
 }
 
@@ -36,6 +37,7 @@ func Commit(c git.CommitEntry, rules []Rule) Results {
 	for _, r := range rules {
 		results = append(results, r.Run(r, c))
 	}
+
 	return results
 }
 
@@ -58,6 +60,7 @@ func (vr Results) PassFail() (pass, fail int) {
 			fail++
 		}
 	}
+
 	return pass, fail
 }
 
@@ -67,6 +70,7 @@ func SanitizeFilters(filtStr string) (filters []string) {
 	for item := range strings.SplitSeq(filtStr, ",") {
 		filters = append(filters, strings.TrimSpace(item))
 	}
+
 	return filters
 }
 
@@ -105,19 +109,23 @@ func StringsSliceEqual(a, b []string) bool {
 	if !sort.StringsAreSorted(a) {
 		sort.Strings(a)
 	}
+
 	if !sort.StringsAreSorted(b) {
 		sort.Strings(b)
 	}
+
 	for i := range b {
 		if !StringsSliceContains(a, b[i]) {
 			return false
 		}
 	}
+
 	for i := range a {
 		if !StringsSliceContains(b, a[i]) {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -126,6 +134,8 @@ func StringsSliceContains(a []string, b string) bool {
 	if !sort.StringsAreSorted(a) {
 		sort.Strings(a)
 	}
+
 	i := sort.SearchStrings(a, b)
+
 	return i < len(a) && a[i] == b
 }
