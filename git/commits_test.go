@@ -6,35 +6,85 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
 
+// TestCommitEntry reads the commits of a two-commit repository made for it,
+// not this repository's history: walking that ran one git process per field
+// per commit, slower with every commit (651 s on a loaded machine, at 141).
 func TestCommitEntry(t *testing.T) {
-	c, err := HeadCommit()
+	newRepository(t, "first commit", "second commit")
+
+	head, err := HeadCommit()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cr, err := Commits(c)
+	commits, err := Commits(head)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, c := range cr {
-		for _, cV := range FieldNames {
-			found := false
+	if len(commits) != 2 {
+		t.Fatalf("Commits(HEAD) = %d commits, want 2", len(commits))
+	}
 
-			for k := range c {
-				if k == cV {
-					found = true
-				}
-			}
-
-			if !found {
-				t.Errorf("failed to find field names: %q", c)
+	for _, commit := range commits {
+		for _, field := range FieldNames {
+			if _, ok := commit[field]; !ok {
+				t.Errorf("commit %q has no %q field", commit["subject"], field)
 			}
 		}
+	}
+
+	if got := commits[0]["subject"]; got != "second commit" {
+		t.Errorf("newest commit's subject = %q, want %q", got, "second commit")
+	}
+}
+
+// newRepository makes a repository in a temporary directory with one signed-off
+// commit per subject, oldest first, and makes it the working directory. The
+// user's and the system's git configuration stay out of it (no signing, no
+// signature display), and so does any repository above it.
+func newRepository(t *testing.T, subjects ...string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	config := filepath.Join(t.TempDir(), "gitconfig")
+
+	if err := os.WriteFile(config, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("GIT_CONFIG_GLOBAL", config)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+	t.Setenv("GIT_AUTHOR_NAME", "Test")
+	t.Setenv("GIT_AUTHOR_EMAIL", "test@example.com")
+	t.Setenv("GIT_COMMITTER_NAME", "Test")
+	t.Setenv("GIT_COMMITTER_EMAIL", "test@example.com")
+	t.Chdir(dir)
+
+	git := func(args ...string) {
+		t.Helper()
+
+		if out, err := exec.CommandContext(t.Context(), "git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+
+	git("init", "-q")
+
+	for i, subject := range subjects {
+		name := filepath.Join(dir, "file"+strconv.Itoa(i))
+		if err := os.WriteFile(name, []byte(subject+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		git("add", ".")
+		git("commit", "-q", "-s", "-m", subject)
 	}
 }
 
