@@ -67,10 +67,12 @@ golangci:
       depguard:
         rules:
           main:
-            # The house logging setup (slog through tint on a terminal, JSON
-            # otherwise), which the command installs in main.
+            # The house command line: kong for the flags, primordium's logger
+            # (slog, tint on a terminal) and shutdown (exit status).
             allow:
+              - github.com/alecthomas/kong
               - github.com/mycophonic/primordium/app/logger
+              - github.com/mycophonic/primordium/app/shutdown
     exclusions:
       rules:
         # ---------------------------------------------------------------------------
@@ -83,11 +85,10 @@ golangci:
         # Counts are the measurement at enrolment, per file and linter: 239 in 10 files.
         # ---------------------------------------------------------------------------
         - path: ^cmd/git-validation/main\.go$
-          linters: # 16 findings
-            - gochecknoglobals # 10
+          linters: # 5 findings
             - forbidigo # 3
-            - revive # 2
             - gocognit # 1
+            - revive # 1
         - path: ^git/commits\.go$
           linters: # 37 findings
             - wrapcheck # 11
