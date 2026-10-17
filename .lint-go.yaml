@@ -63,6 +63,14 @@
 #     - internal/legacy/
 golangci:
   linters:
+    settings:
+      depguard:
+        rules:
+          main:
+            # The house logging setup (slog through tint on a terminal, JSON
+            # otherwise), which the command installs in main.
+            allow:
+              - github.com/mycophonic/primordium/app/logger
     exclusions:
       rules:
         # ---------------------------------------------------------------------------
@@ -75,20 +83,17 @@ golangci:
         # Counts are the measurement at enrolment, per file and linter: 239 in 10 files.
         # ---------------------------------------------------------------------------
         - path: ^cmd/git-validation/main\.go$
-          linters: # 18 findings
+          linters: # 16 findings
             - gochecknoglobals # 10
             - forbidigo # 3
             - revive # 2
-            - depguard # 1
-            - gochecknoinits # 1
             - gocognit # 1
         - path: ^git/commits\.go$
-          linters: # 39 findings
+          linters: # 37 findings
             - wrapcheck # 11
             - noctx # 10
             - gosec # 8
             - varnamelen # 3
-            - depguard # 2
             - gochecknoglobals # 2
             - goconst # 2
             - revive # 1
@@ -132,10 +137,9 @@ golangci:
             - paralleltest # 2
             - testpackage # 1
         - path: ^validate/runner\.go$
-          linters: # 18 findings
+          linters: # 17 findings
             - forbidigo # 7
             - wrapcheck # 6
             - varnamelen # 2
-            - depguard # 1
             - err113 # 1
             - gocognit # 1
