@@ -2,6 +2,7 @@ package git
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"testing"
 )
@@ -51,5 +52,28 @@ func TestMarshal(t *testing.T) {
 				t.Errorf("failed to find field names: %q", c)
 			}
 		}
+	}
+}
+
+func TestVersionAtLeast(t *testing.T) {
+	for _, tc := range []struct {
+		have, want string
+		ok         bool
+	}{
+		{"2.54.0", "1.9.5", true},
+		{"1.9.5", "1.9.5", true},
+		{"1.9.4", "1.9.5", false},
+		{"1.9", "1.9.5", false},
+		{"1.10.0", "1.9.5", true},
+		{"2.42.0.windows.2", "1.9.5", true},
+	} {
+		got, err := versionAtLeast(tc.have, tc.want)
+		if err != nil || got != tc.ok {
+			t.Errorf("versionAtLeast(%q, %q) = %v, %v, want %v", tc.have, tc.want, got, err, tc.ok)
+		}
+	}
+
+	if _, err := versionAtLeast("windows", "1.9.5"); !errors.Is(err, errNoVersionNumber) {
+		t.Errorf("versionAtLeast(%q, _) error = %v, want errNoVersionNumber", "windows", err)
 	}
 }

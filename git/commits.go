@@ -1,12 +1,14 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
+	"strconv"
 	"strings"
 
-	version "github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -121,15 +123,47 @@ func gitVersionNewerThan(otherV string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	v1, err := version.NewVersion(gv)
+
+	return versionAtLeast(gv, otherV)
+}
+
+var errNoVersionNumber = errors.New("no version number")
+
+// versionAtLeast reports whether git version have is want or later. Only the
+// leading dot-separated numbers count, so a Windows build's 2.42.0.windows.2
+// is 2.42.0, and a missing segment is lower than any present one: 1.9 is
+// before 1.9.5.
+func versionAtLeast(have, want string) (bool, error) {
+	haveNumbers, err := versionNumbers(have)
 	if err != nil {
 		return false, err
 	}
-	v2, err := version.NewVersion(otherV)
+
+	wantNumbers, err := versionNumbers(want)
 	if err != nil {
 		return false, err
 	}
-	return v2.Equal(v1) || v2.LessThan(v1), nil
+
+	return slices.Compare(haveNumbers, wantNumbers) >= 0, nil
+}
+
+func versionNumbers(gitVersion string) ([]int, error) {
+	var numbers []int
+
+	for field := range strings.SplitSeq(gitVersion, ".") {
+		number, err := strconv.Atoi(field)
+		if err != nil {
+			break
+		}
+
+		numbers = append(numbers, number)
+	}
+
+	if len(numbers) == 0 {
+		return nil, fmt.Errorf("git version %q: %w", gitVersion, errNoVersionNumber)
+	}
+
+	return numbers, nil
 }
 
 // Check warns if changes introduce whitespace errors.
