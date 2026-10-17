@@ -33,5 +33,6 @@ func ValidateDanglingWhitespace(r validate.Rule, c git.CommitEntry) (vr validate
 			vr.Msg = "errored with: " + err.Error()
 		}
 	}
+
 	return vr
 }

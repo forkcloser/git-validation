@@ -25,18 +25,23 @@ func ValidateShortSubject(r validate.Rule, c git.CommitEntry) (vr validate.Resul
 	if len(strings.Split(c["parent"], " ")) > 1 {
 		vr.Pass = true
 		vr.Msg = "merge commits do not require length check"
+
 		return vr
 	}
+
 	if len(c["subject"]) >= 90 {
 		vr.Pass = false
 		vr.Msg = "commit subject exceeds 90 characters"
+
 		return vr
 	}
+
 	vr.Pass = true
 	if len(c["subject"]) > 72 {
 		vr.Msg = "commit subject is under 90 characters, but is still more than 72 chars"
 	} else {
 		vr.Msg = "commit subject is 72 characters or less! *yay*"
 	}
+
 	return vr
 }

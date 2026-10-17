@@ -25,8 +25,10 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Ru
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path of %q: %w", root, err)
 	}
+
 	if commitrange == "" {
 		var cwd string
+
 		cwd, err = os.Getwd()
 		if err != nil {
 			return nil, err
@@ -40,6 +42,7 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Ru
 		if err = os.Chdir(newroot); err != nil {
 			return nil, err
 		}
+
 		commitrange, err = git.FetchHeadCommit()
 		if err != nil {
 			commitrange, err = git.HeadCommit()
@@ -48,7 +51,9 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Ru
 			}
 		}
 	}
+
 	logrus.Debugf("[NewRunner] commitrange: %q", commitrange)
+
 	return &Runner{
 		Root:        newroot,
 		Rules:       rules,
@@ -84,8 +89,10 @@ func (r *Runner) Run() error {
 		if os.Getenv("QUIET") == "" {
 			fmt.Printf(" * %s %q ... ", commit["abbreviated_commit"], commit["subject"])
 		}
+
 		vr := Commit(commit, r.Rules)
 		r.Results = append(r.Results, vr...)
+
 		_, fail := vr.PassFail()
 		if os.Getenv("QUIET") != "" {
 			if fail != 0 {
@@ -99,11 +106,13 @@ func (r *Runner) Run() error {
 			// If we're quiet, then just continue
 			continue
 		}
+
 		if fail == 0 {
 			fmt.Println("PASS")
 		} else {
 			fmt.Println("FAIL")
 		}
+
 		for _, res := range vr {
 			if r.Verbose {
 				if res.Pass {
@@ -116,5 +125,6 @@ func (r *Runner) Run() error {
 			}
 		}
 	}
+
 	return nil
 }
