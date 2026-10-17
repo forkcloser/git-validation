@@ -6,3 +6,6 @@
 /_scratch
 .claude
 .idea
+
+# Required by limen (book/mandatory-files.md, ".gitignore").
+/.build
