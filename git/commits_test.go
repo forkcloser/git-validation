@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -83,5 +86,27 @@ func TestVersionAtLeast(t *testing.T) {
 
 	if _, err := versionAtLeast("windows", "1.9.5"); !errors.Is(err, errNoVersionNumber) {
 		t.Errorf("versionAtLeast(%q, _) error = %v, want errNoVersionNumber", "windows", err)
+	}
+}
+
+// TestCommitsOutsideARepository pins the failure path: the git command that
+// failed is named in the error, which still unwraps to git's exit.
+func TestCommitsOutsideARepository(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	// No repository above it either.
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+
+	_, err := Commits("HEAD~1..HEAD")
+	if err == nil {
+		t.Fatal("Commits outside a repository succeeded")
+	}
+
+	if !strings.Contains(err.Error(), "git log --pretty=oneline --no-show-signature") {
+		t.Errorf("Commits error = %q, want it to name the git command", err)
+	}
+
+	if _, ok := errors.AsType[*exec.ExitError](err); !ok {
+		t.Errorf("Commits error = %v, want it to unwrap to *exec.ExitError", err)
 	}
 }
