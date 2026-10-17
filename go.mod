@@ -2,7 +2,10 @@ module github.com/forkcloser/git-validation
 
 go 1.26.0
 
-require github.com/mycophonic/primordium v0.15.0
+require (
+	github.com/alecthomas/kong v1.16.1
+	github.com/mycophonic/primordium v0.15.0
+)
 
 require (
 	github.com/lmittmann/tint v1.2.1 // indirect

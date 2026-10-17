@@ -13,24 +13,34 @@ go install github.com/forkcloser/git-validation/cmd/git-validation@latest
 The flags
 
 ```shell
-vbatts@valse ~/src/vb/git-validation (master *) $ git-validation -h
-Usage of git-validation:
-  -D    debug output
-  -d string
-        git directory to validate from (default ".")
-  -list-rules
-        list the rules registered
-  -range string
-        use this commit range instead
-  -run string
-        comma delimited list of rules to run. Defaults to all.
-  -v    verbose
+$ git-validation --help
+Usage: git-validation [flags]
+
+A way to do validation on git commits.
+
+Flags:
+  -h, --help                   Show context-sensitive help.
+      --range=STRING           use this commit range instead (implies
+                               --no-travis)
+      --list-rules             list the rules registered
+      --run=STRING             comma delimited list of rules to run. Defaults to
+                               all.
+  -v, --verbose                verbose
+  -D, --debug                  debug output
+  -q, --quiet                  less output
+  -d, --dir="."                git directory to validate from
+      --no-github              disables Github Actions environment checks (when
+                               env GITHUB_ACTIONS=true is set)
+      --no-travis              disables travis environment checks (when env
+                               TRAVIS=true is set)
+      --[no-]travis-pr-only    when on travis, only run validations if the
+                               CI-Build is checking pull-request build
 ```
 
 The entire default rule set is run by default:
 
 ```shell
-vbatts@valse ~/src/vb/git-validation (master) $ git-validation -list-rules
+vbatts@valse ~/src/vb/git-validation (master) $ git-validation --list-rules
 "dangling-whitespace" -- checking the presence of dangling whitespaces on line endings
 "DCO" -- makes sure the commits are signed
 "message_regexp" -- checks the commit message for a user provided regular expression
@@ -40,7 +50,7 @@ vbatts@valse ~/src/vb/git-validation (master) $ git-validation -list-rules
 Or, specify comma-delimited rules to run:
 
 ```shell
-vbatts@valse ~/src/vb/git-validation (master) $ git-validation -run DCO,short-subject
+vbatts@valse ~/src/vb/git-validation (master) $ git-validation --run DCO,short-subject
  * b243ca4 "README: adding install and usage" ... PASS
  * d614ccf "*: run tests in a runner" ... PASS
  * b9413c6 "shortsubject: add a subject length check" ... PASS
@@ -94,7 +104,7 @@ vbatts@valse ~/src/vb/git-validation (master) $ echo $?
 Excluding paths that are out of the scope of your project:
 
 ```shell
-vbatts@valse ~/src/vb/git-validation (master) $ GIT_CHECK_EXCLUDE="./vendor:./git/testdata" git-validation -q -run dangling-whitespace
+vbatts@valse ~/src/vb/git-validation (master) $ GIT_CHECK_EXCLUDE="./vendor:./git/testdata" git-validation -q --run dangling-whitespace
 ...
 ```
 
