@@ -98,9 +98,8 @@ golangci:
             - goconst # 2
             - revive # 1
         - path: ^git/commits_test\.go$
-          linters: # 4 findings
+          linters: # 3 findings
             - paralleltest # 2
-            - depguard # 1
             - testpackage # 1
         - path: ^rules/danglingwhitespace/rule\.go$
           linters: # 5 findings
