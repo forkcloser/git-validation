@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -14,12 +15,18 @@ var (
 	registerRuleLock = sync.Mutex{}
 )
 
-// RegisterRule includes the Rule in the avaible set to use.
+// RegisterRule includes the Rule in the avaible set to use. The set stays
+// ordered by name, ignoring case: rules register from their packages' init,
+// whose order is the Go toolchain's to choose and moved when main gained an
+// import, and the set's order is the order of every report.
 func RegisterRule(vr Rule) {
 	registerRuleLock.Lock()
 	defer registerRuleLock.Unlock()
 
 	RegisteredRules = append(RegisteredRules, vr)
+	slices.SortStableFunc(RegisteredRules, func(a, b Rule) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	})
 }
 
 // Rule will operate over a provided git.CommitEntry, and return a result.

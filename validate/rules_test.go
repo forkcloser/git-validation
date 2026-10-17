@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -48,5 +49,27 @@ func TestSliceHelpers(t *testing.T) {
 		if got != set[i].Equal {
 			t.Errorf("expected %d A and B comparison to be %t, but got %t", i, set[i].Equal, got)
 		}
+	}
+}
+
+func TestRegisterRuleOrder(t *testing.T) {
+	saved := RegisteredRules
+
+	t.Cleanup(func() { RegisteredRules = saved })
+
+	RegisteredRules = nil
+
+	for _, name := range []string{"short-subject", "DCO", "message_regexp", "dangling-whitespace"} {
+		RegisterRule(Rule{Name: name})
+	}
+
+	var got []string
+	for _, rule := range RegisteredRules {
+		got = append(got, rule.Name)
+	}
+
+	want := []string{"dangling-whitespace", "DCO", "message_regexp", "short-subject"}
+	if !slices.Equal(got, want) {
+		t.Errorf("RegisteredRules = %q, want %q", got, want)
 	}
 }
