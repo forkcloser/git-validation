@@ -10,12 +10,12 @@ import (
 )
 
 var (
-	// RegisteredRules are the avaible validation to perform on git commits.
+	// RegisteredRules are the available validations to perform on git commits.
 	RegisteredRules  = []Rule{}
 	registerRuleLock = sync.Mutex{}
 )
 
-// RegisterRule includes the Rule in the avaible set to use. The set stays
+// RegisterRule includes the Rule in the available set to use. The set stays
 // ordered by name, ignoring case: rules register from their packages' init,
 // whose order is the Go toolchain's to choose and moved when main gained an
 // import, and the set's order is the order of every report.
