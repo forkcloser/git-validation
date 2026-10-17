@@ -5,7 +5,7 @@ A way to do validation on git commits.
 ## install
 
 ```shell
-go install github.com/forkcloser/git-validation@latest
+go install github.com/forkcloser/git-validation/cmd/git-validation@latest
 ```
 
 ## usage
