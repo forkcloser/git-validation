@@ -39,8 +39,14 @@ func TestCommitEntry(t *testing.T) {
 		}
 	}
 
-	if got := commits[0]["subject"]; got != "second commit" {
-		t.Errorf("newest commit's subject = %q, want %q", got, "second commit")
+	for i, want := range []string{"second commit", "first commit"} {
+		if got := commits[i]["subject"]; got != want {
+			t.Errorf("commit %d's subject = %q, want %q", i, got, want)
+		}
+
+		if got := commits[i]["author_email"]; got != "test@example.com" {
+			t.Errorf("commit %d's author_email = %q, want test@example.com", i, got)
+		}
 	}
 }
 
