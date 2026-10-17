@@ -10,7 +10,7 @@ import (
 	"github.com/forkcloser/git-validation/git"
 )
 
-// Runner is the for processing a set of rules against a range of commits
+// Runner is the for processing a set of rules against a range of commits.
 type Runner struct {
 	Root        string
 	Rules       []Rule
@@ -57,7 +57,7 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Ru
 	}, nil
 }
 
-// Run processes the rules for each commit in the range provided
+// Run processes the rules for each commit in the range provided.
 func (r *Runner) Run() error {
 	cwd, err := os.Getwd()
 	if err != nil {
