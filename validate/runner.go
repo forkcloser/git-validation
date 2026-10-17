@@ -23,21 +23,21 @@ type Runner struct {
 func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Runner, error) {
 	newroot, err := filepath.Abs(root)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path of %q: %s", root, err)
+		return nil, fmt.Errorf("failed to get absolute path of %q: %w", root, err)
 	}
 	if commitrange == "" {
-		var err error
-		cwd, err := os.Getwd()
+		var cwd string
+		cwd, err = os.Getwd()
 		if err != nil {
 			return nil, err
 		}
 		defer func() {
-			if err := os.Chdir(cwd); err != nil {
-				logrus.Warnf("changing working directory to %q failed: %s", cwd, err)
+			if chdirErr := os.Chdir(cwd); chdirErr != nil {
+				logrus.Warnf("changing working directory to %q failed: %s", cwd, chdirErr)
 			}
 		}()
 
-		if err := os.Chdir(newroot); err != nil {
+		if err = os.Chdir(newroot); err != nil {
 			return nil, err
 		}
 		commitrange, err = git.FetchHeadCommit()
@@ -64,12 +64,12 @@ func (r *Runner) Run() error {
 		return err
 	}
 	defer func() {
-		if err := os.Chdir(cwd); err != nil {
-			logrus.Warnf("changing working directory to %q failed: %s", cwd, err)
+		if chdirErr := os.Chdir(cwd); chdirErr != nil {
+			logrus.Warnf("changing working directory to %q failed: %s", cwd, chdirErr)
 		}
 	}()
 
-	if err := os.Chdir(r.Root); err != nil {
+	if err = os.Chdir(r.Root); err != nil {
 		return err
 	}
 

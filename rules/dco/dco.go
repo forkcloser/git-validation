@@ -34,7 +34,7 @@ func ValidateDCO(r validate.Rule, c git.CommitEntry) (vr validate.Result) {
 	}
 
 	hasValid := false
-	for _, line := range strings.Split(c["body"], "\n") {
+	for line := range strings.SplitSeq(c["body"], "\n") {
 		if ValidDCO.MatchString(line) {
 			hasValid = true
 		}

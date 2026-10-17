@@ -3,7 +3,7 @@ package git
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"os"
 	"testing"
 )
 
@@ -32,7 +32,7 @@ func TestCommitEntry(t *testing.T) {
 }
 
 func TestMarshal(t *testing.T) {
-	buf, err := ioutil.ReadFile("testdata/commits.json")
+	buf, err := os.ReadFile("testdata/commits.json")
 	if err != nil {
 		t.Fatal(err)
 	}

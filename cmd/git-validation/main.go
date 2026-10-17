@@ -44,10 +44,14 @@ func main() {
 	flag.Parse()
 
 	if *flDebug {
-		os.Setenv("DEBUG", "1")
+		if err := os.Setenv("DEBUG", "1"); err != nil {
+			logrus.Fatal(err)
+		}
 	}
 	if *flQuiet {
-		os.Setenv("QUIET", "1")
+		if err := os.Setenv("QUIET", "1"); err != nil {
+			logrus.Fatal(err)
+		}
 	}
 
 	if *flListRules {

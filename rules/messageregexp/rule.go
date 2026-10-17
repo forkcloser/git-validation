@@ -38,12 +38,12 @@ func ValidateMessageRegexp(r validate.Rule, c git.CommitEntry) (vr validate.Resu
 	}
 
 	hasValid := false
-	for _, line := range strings.Split(c["subject"], "\n") {
+	for line := range strings.SplitSeq(c["subject"], "\n") {
 		if re.MatchString(line) {
 			hasValid = true
 		}
 	}
-	for _, line := range strings.Split(c["body"], "\n") {
+	for line := range strings.SplitSeq(c["body"], "\n") {
 		if re.MatchString(line) {
 			hasValid = true
 		}

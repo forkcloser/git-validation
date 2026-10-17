@@ -72,12 +72,12 @@ func checkRevList(commitrange string) (string, error) {
 	// We want the last commit hash only.. (i.e. `| tail -n1 | awk '{ print $1 }'`)
 	chunks := strings.Split(strings.TrimSpace(string(output)), "\n")
 	if len(chunks) == 1 {
-		return strings.Split(chunks[0], " ")[0], nil
+		commit, _, _ := strings.Cut(chunks[0], " ")
+		return commit, nil
 	}
-	last := chunks[len(chunks)-1]
-	lastCommit := strings.Split(last, " ")[0]
+	lastCommit, _, _ := strings.Cut(chunks[len(chunks)-1], " ")
 
-	return fmt.Sprintf("%s..HEAD", lastCommit), nil
+	return lastCommit + "..HEAD", nil
 }
 
 // FieldNames are for the formating and rendering of the CommitEntry structs.
@@ -188,12 +188,11 @@ func Check(commit string) ([]byte, error) {
 			return nil, err
 		}
 		if gitNewEnough {
-			excludeList := strings.Split(excludeEnvList, ":")
-			for _, exclude := range excludeList {
+			for exclude := range strings.SplitSeq(excludeEnvList, ":") {
 				if exclude == "" {
 					continue
 				}
-				args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", exclude))
+				args = append(args, "--", ".", ":(exclude)"+exclude)
 			}
 		}
 	}
@@ -258,7 +257,7 @@ func LogCommit(commit string) (*CommitEntry, error) {
 }
 
 func debug() bool {
-	return len(os.Getenv("DEBUG")) > 0
+	return os.Getenv("DEBUG") != ""
 }
 
 // FetchHeadCommit returns the hash of FETCH_HEAD.

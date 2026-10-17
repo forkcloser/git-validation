@@ -23,7 +23,7 @@ func RegisterRule(vr Rule) {
 
 // Rule will operate over a provided git.CommitEntry, and return a result.
 type Rule struct {
-	Name        string // short name for reference in in the `-run=...` flag
+	Name        string // short name for reference in the `-run=...` flag
 	Value       string // value to configure for the rule (i.e. a regexp to check for in the commit message)
 	Description string // longer Description for readability
 	Run         func(Rule, git.CommitEntry) Result
@@ -64,7 +64,7 @@ func (vr Results) PassFail() (pass, fail int) {
 // SanitizeFilters takes a comma delimited list and returns the trimmend and
 // split (on ",") items in the list.
 func SanitizeFilters(filtStr string) (filters []string) {
-	for _, item := range strings.Split(filtStr, ",") {
+	for item := range strings.SplitSeq(filtStr, ",") {
 		filters = append(filters, strings.TrimSpace(item))
 	}
 	return filters
@@ -87,14 +87,12 @@ func FilterRules(rules []Rule, includes []string) []Rule {
 					// multiple "regexp=" with different values. We'll need to set the
 					// .Value = chunk[1] and ensure r is dup'ed so they don't clobber
 					// each other.
-					newR := Rule(r)
+					newR := r
 					newR.Value = chunks[1]
 					ret = append(ret, newR)
 				}
-			} else {
-				if strings.EqualFold(r.Name, includes[i]) {
-					ret = append(ret, r)
-				}
+			} else if strings.EqualFold(r.Name, includes[i]) {
+				ret = append(ret, r)
 			}
 		}
 	}
