@@ -1,11 +1,10 @@
 package validate
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/forkcloser/git-validation/git"
 )
@@ -20,7 +19,7 @@ type Runner struct {
 }
 
 // NewRunner returns an initiallized Runner.
-func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Runner, error) {
+func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (runner *Runner, err error) {
 	newroot, err := filepath.Abs(root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path of %q: %w", root, err)
@@ -35,7 +34,7 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Ru
 		}
 		defer func() {
 			if chdirErr := os.Chdir(cwd); chdirErr != nil {
-				logrus.Warnf("changing working directory to %q failed: %s", cwd, chdirErr)
+				runner, err = nil, errors.Join(err, fmt.Errorf("returning to %q: %w", cwd, chdirErr))
 			}
 		}()
 
@@ -52,8 +51,6 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Ru
 		}
 	}
 
-	logrus.Debugf("[NewRunner] commitrange: %q", commitrange)
-
 	return &Runner{
 		Root:        newroot,
 		Rules:       rules,
@@ -63,14 +60,14 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (*Ru
 }
 
 // Run processes the rules for each commit in the range provided.
-func (r *Runner) Run() error {
+func (r *Runner) Run() (err error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if chdirErr := os.Chdir(cwd); chdirErr != nil {
-			logrus.Warnf("changing working directory to %q failed: %s", cwd, chdirErr)
+			err = errors.Join(err, fmt.Errorf("returning to %q: %w", cwd, chdirErr))
 		}
 	}()
 

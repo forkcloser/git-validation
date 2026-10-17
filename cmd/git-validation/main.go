@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/mycophonic/primordium/app/logger"
 
 	_ "github.com/forkcloser/git-validation/rules/danglingwhitespace"
 	_ "github.com/forkcloser/git-validation/rules/dco"
@@ -36,22 +38,14 @@ var (
 	)
 )
 
-func init() {
-	logrus.SetOutput(os.Stderr)
-}
-
 func main() {
 	flag.Parse()
 
-	if *flDebug {
-		if err := os.Setenv("DEBUG", "1"); err != nil {
-			logrus.Fatal(err)
-		}
-	}
+	configureLogger(*flDebug, *flQuiet)
 
 	if *flQuiet {
 		if err := os.Setenv("QUIET", "1"); err != nil {
-			logrus.Fatal(err)
+			exitOn("quiet output", err)
 		}
 	}
 
@@ -82,9 +76,7 @@ func main() {
 		rules = validate.FilterRules(validate.RegisteredRules, validate.SanitizeFilters(*flRun))
 	}
 
-	if os.Getenv("DEBUG") != "" {
-		logrus.Printf("%#v", rules) // XXX maybe reduce this list
-	}
+	slog.Debug("rules to run", "rules", ruleNames(rules))
 
 	commitRange := *flCommitRange
 	if commitRange == "" {
@@ -101,15 +93,15 @@ func main() {
 		}
 	}
 
-	logrus.Infof("using commit range: %s", commitRange)
+	slog.Info("using commit range", "range", commitRange)
 
 	runner, err := validate.NewRunner(*flDir, rules, commitRange, *flVerbose)
 	if err != nil {
-		logrus.Fatal(err)
+		exitOn("preparing the run", err)
 	}
 
 	if err := runner.Run(); err != nil {
-		logrus.Fatal(err)
+		exitOn("validating commits", err)
 	}
 
 	_, fail := runner.Results.PassFail()
@@ -117,4 +109,35 @@ func main() {
 		fmt.Printf("%d commits to fix\n", fail)
 		os.Exit(1)
 	}
+}
+
+// configureLogger installs the process-wide slog handler through primordium:
+// tint on a terminal, JSON when stderr is redirected. -D shows debug records,
+// -q only warnings and errors.
+func configureLogger(debug, quiet bool) {
+	level := slog.LevelInfo
+
+	switch {
+	case debug:
+		level = slog.LevelDebug
+	case quiet:
+		level = slog.LevelWarn
+	}
+
+	logger.SetDefaultsForLogger(context.Background(), level)
+}
+
+// exitOn logs err with the step that failed and exits 1.
+func exitOn(step string, err error) {
+	slog.Error("git-validation failed", "step", step, "err", err)
+	os.Exit(1)
+}
+
+func ruleNames(rules []validate.Rule) []string {
+	names := make([]string, 0, len(rules))
+	for _, rule := range rules {
+		names = append(names, rule.Name)
+	}
+
+	return names
 }
