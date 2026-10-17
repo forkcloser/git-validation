@@ -7,7 +7,7 @@ import (
 	"github.com/forkcloser/git-validation/validate"
 )
 
-// ShortSubjectRule is the rule being registered
+// ShortSubjectRule is the rule being registered.
 var ShortSubjectRule = validate.Rule{
 	Name:        "short-subject",
 	Description: "commit subjects are strictly less than 90 (github ellipsis length)",

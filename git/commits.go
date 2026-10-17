@@ -79,7 +79,7 @@ func checkRevList(commitrange string) (string, error) {
 }
 
 // FieldNames are for the formating and rendering of the CommitEntry structs.
-// Keys here are from git log pretty format "format:..."
+// Keys here are from git log pretty format "format:...".
 var FieldNames = map[string]string{
 	"%h":  "abbreviated_commit",
 	"%p":  "abbreviated_parent",
@@ -184,10 +184,10 @@ func Show(commit string) ([]byte, error) {
 }
 
 // CommitEntry represents a single commit's information from `git`.
-// See also FieldNames
+// See also FieldNames.
 type CommitEntry map[string]string
 
-// LogUntil returns the array of oneline commits from initial until the provided commit
+// LogUntil returns the array of oneline commits from initial until the provided commit.
 func LogUntil(commit string) ([]string, error) {
 	cmd := exec.Command("git", "--no-pager", "log", "--oneline", "--no-show-signature", commit)
 	if debug() {
@@ -202,7 +202,7 @@ func LogUntil(commit string) ([]string, error) {
 	return strings.Split(strings.TrimSpace(string(out)), "\n"), nil
 }
 
-// LogCommit assembles the full information on a commit from its commit hash
+// LogCommit assembles the full information on a commit from its commit hash.
 func LogCommit(commit string) (*CommitEntry, error) {
 	c := CommitEntry{}
 	for k, v := range FieldNames {
@@ -227,7 +227,7 @@ func debug() bool {
 	return len(os.Getenv("DEBUG")) > 0
 }
 
-// FetchHeadCommit returns the hash of FETCH_HEAD
+// FetchHeadCommit returns the hash of FETCH_HEAD.
 func FetchHeadCommit() (string, error) {
 	cmdArgs := []string{"git", "--no-pager", "rev-parse", "--verify", "FETCH_HEAD"}
 	if debug() {
@@ -241,7 +241,7 @@ func FetchHeadCommit() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// HeadCommit returns the hash of HEAD
+// HeadCommit returns the hash of HEAD.
 func HeadCommit() (string, error) {
 	cmdArgs := []string{"git", "--no-pager", "rev-parse", "--verify", "HEAD"}
 	if debug() {

@@ -9,12 +9,12 @@ import (
 )
 
 var (
-	// RegisteredRules are the avaible validation to perform on git commits
+	// RegisteredRules are the avaible validation to perform on git commits.
 	RegisteredRules  = []Rule{}
 	registerRuleLock = sync.Mutex{}
 )
 
-// RegisterRule includes the Rule in the avaible set to use
+// RegisterRule includes the Rule in the avaible set to use.
 func RegisterRule(vr Rule) {
 	registerRuleLock.Lock()
 	defer registerRuleLock.Unlock()
@@ -49,7 +49,7 @@ type Result struct {
 // Results is a set of results. This is type makes it easy for the following function.
 type Results []Result
 
-// PassFail gives a quick over/under of passes and failures of the results in this set
+// PassFail gives a quick over/under of passes and failures of the results in this set.
 func (vr Results) PassFail() (pass, fail int) {
 	for _, res := range vr {
 		if res.Pass {
@@ -62,7 +62,7 @@ func (vr Results) PassFail() (pass, fail int) {
 }
 
 // SanitizeFilters takes a comma delimited list and returns the trimmend and
-// split (on ",") items in the list
+// split (on ",") items in the list.
 func SanitizeFilters(filtStr string) (filters []string) {
 	for _, item := range strings.Split(filtStr, ",") {
 		filters = append(filters, strings.TrimSpace(item))
@@ -74,7 +74,7 @@ func SanitizeFilters(filtStr string) (filters []string) {
 // returns the reduced set.  The comparison is case insensitive.
 //
 // Some `includes` rules have values assigned to them.
-// i.e. -run "dco,message_regexp='^JIRA-[0-9]+ [A-Z].*$'"
+// i.e. -run "dco,message_regexp='^JIRA-[0-9]+ [A-Z].*$'".
 func FilterRules(rules []Rule, includes []string) []Rule {
 	ret := []Rule{}
 
@@ -102,7 +102,7 @@ func FilterRules(rules []Rule, includes []string) []Rule {
 	return ret
 }
 
-// StringsSliceEqual compares two string arrays for equality
+// StringsSliceEqual compares two string arrays for equality.
 func StringsSliceEqual(a, b []string) bool {
 	if !sort.StringsAreSorted(a) {
 		sort.Strings(a)
@@ -123,7 +123,7 @@ func StringsSliceEqual(a, b []string) bool {
 	return true
 }
 
-// StringsSliceContains checks for the presence of a word in string array
+// StringsSliceContains checks for the presence of a word in string array.
 func StringsSliceContains(a []string, b string) bool {
 	if !sort.StringsAreSorted(a) {
 		sort.Strings(a)

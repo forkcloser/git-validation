@@ -13,7 +13,7 @@ func init() {
 	validate.RegisterRule(RegexpRule)
 }
 
-// RegexpRule for validating a user provided regex on the commit messages
+// RegexpRule for validating a user provided regex on the commit messages.
 var RegexpRule = validate.Rule{
 	Name:        "message_regexp",
 	Description: "checks the commit message for a user provided regular expression",
@@ -21,7 +21,7 @@ var RegexpRule = validate.Rule{
 	Default:     false, // only for users specifically calling it through -run ...
 }
 
-// ValidateMessageRegexp is the message regex func to run
+// ValidateMessageRegexp is the message regex func to run.
 func ValidateMessageRegexp(r validate.Rule, c git.CommitEntry) (vr validate.Result) {
 	if r.Value == "" {
 		vr.Pass = true
