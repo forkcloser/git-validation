@@ -1,15 +1,15 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # goreleaser — https://goreleaser.com — the git-validation binary.
 # Local dry-run: `just do release --local --dry-run` (no tag, no publish,
-# artifacts under build/). Real release: `just do release vX.Y.Z`.
+# artifacts under .build/). Real release: `just do release vX.Y.Z`.
 version: 2
 
 project_name: git-validation
 
-# Under build/ (covered by the canonical .gitignore), in a subdirectory of its
+# Under .build/ (covered by the canonical .gitignore), in a subdirectory of its
 # own: goreleaser --clean wipes its dist directory, and the dev builds the
-# other recipes put in build/ must survive a release run.
-dist: build/release
+# other recipes put in .build/ must survive a release run.
+dist: .build/release
 
 # Twin of the `release` recipe in .limen/just/build-go.just. CGO off, so the
 # whole target matrix builds from one machine. Exactly the platforms
