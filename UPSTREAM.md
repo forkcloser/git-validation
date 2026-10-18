@@ -19,3 +19,7 @@ Fork of https://github.com/vbatts/git-validation (`main`).
 
 | Change | Here |
 | --- | --- |
+| Installed from `github.com/forkcloser/git-validation/cmd/git-validation`, and released as signed binaries | https://github.com/forkcloser/git-validation/pull/7 |
+| On Windows, `GIT_CHECK_EXCLUDE` works (git's version was compared by a parser that refused `2.42.0.windows.2`); hashicorp/go-version leaves the dependencies | https://github.com/forkcloser/git-validation/pull/8 |
+| Logs through `log/slog` (colored on a terminal, JSON otherwise) instead of logrus; the library packages log nothing and return errors naming the git command that failed | https://github.com/forkcloser/git-validation/pull/12 |
+| Flags parsed by kong: long flags take two dashes (`--run`, `--range`; `-run` is refused), `-v`/`-D`/`-q`/`-d` gain long forms, `--no-travis-pr-only` | https://github.com/forkcloser/git-validation/pull/16 |
