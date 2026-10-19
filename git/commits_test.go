@@ -1,8 +1,10 @@
 package git
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,6 +48,38 @@ func TestCommitEntry(t *testing.T) {
 
 		if got := commits[i]["author_email"]; got != "test@example.com" {
 			t.Errorf("commit %d's author_email = %q, want test@example.com", i, got)
+		}
+	}
+}
+
+// TestCommandsAreRecordedAtDebug checks the initial commit with a debug
+// handler installed: each git command run and the skipped check are recorded.
+func TestCommandsAreRecordedAtDebug(t *testing.T) {
+	newRepository(t, "only commit")
+
+	var records bytes.Buffer
+
+	previous := slog.Default()
+
+	slog.SetDefault(slog.New(slog.NewTextHandler(&records, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	head, err := HeadCommit()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Check(head); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		`msg="running git" cmd="git --no-pager rev-parse --verify HEAD"`,
+		`msg="running git" cmd="git --no-pager log --oneline --no-show-signature ` + head + `"`,
+		`msg="skipping the whitespace check of the initial commit, which has no parent" commit=` + head,
+	} {
+		if !strings.Contains(records.String(), want) {
+			t.Errorf("no record %s in:\n%s", want, records.String())
 		}
 	}
 }
