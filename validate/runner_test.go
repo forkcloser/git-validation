@@ -2,6 +2,7 @@ package validate_test
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -68,5 +69,44 @@ func TestNewRunnerRecordsTheCommitItStartsFrom(t *testing.T) {
 	want := `msg="no commit range given, validating from" commit=` + head
 	if !strings.Contains(records.String(), want) {
 		t.Errorf("no record %s in:\n%s", want, records.String())
+	}
+}
+
+// errValueDoesNotCompile stands in for a rule's refusal of its value.
+var errValueDoesNotCompile = errors.New("value does not compile")
+
+// TestNewRunnerRefusesAValueItsRuleCannotRun: a rule's Check judges its
+// Value before any commit is read, so the run is refused with the rule's
+// name and the check's words, outside any repository.
+func TestNewRunnerRefusesAValueItsRuleCannotRun(t *testing.T) {
+	t.Parallel()
+
+	rule := validate.Rule{
+		Name:  "checked",
+		Value: "(",
+		Check: func(value string) error {
+			if value == "(" {
+				return errValueDoesNotCompile
+			}
+
+			return nil
+		},
+	}
+
+	runner, err := validate.NewRunner(t.TempDir(), []validate.Rule{rule}, "HEAD", false)
+	if !errors.Is(err, errValueDoesNotCompile) || runner != nil {
+		t.Fatalf("NewRunner with a refused value: %v, %v", runner, err)
+	}
+
+	if !strings.Contains(err.Error(), "rule checked: value does not compile") {
+		t.Fatalf("NewRunner with a refused value: %v; want the rule's name and the check's words", err)
+	}
+
+	rule.Value = "ok"
+
+	rules := []validate.Rule{rule, {Name: "unchecked"}}
+
+	if _, err := validate.NewRunner(t.TempDir(), rules, "HEAD", false); err != nil {
+		t.Fatalf("NewRunner with an accepted value and an unchecked rule: %v", err)
 	}
 }
