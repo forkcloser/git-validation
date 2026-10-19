@@ -4,6 +4,7 @@
 package validate_test
 
 import (
+	"errors"
 	"regexp"
 	"slices"
 	"strings"
@@ -41,7 +42,16 @@ func TestContractRegistryIsTheREADMEsList(t *testing.T) {
 	for i, w := range want {
 		r := validate.RegisteredRules[i]
 		if r.Name != w.name || r.Description != w.description || r.Default != w.byDefault || r.Run == nil {
-			t.Errorf("rule %d is %q %q default %v, want %q %q default %v", i, r.Name, r.Description, r.Default, w.name, w.description, w.byDefault)
+			t.Errorf(
+				"rule %d is %q %q default %v, want %q %q default %v",
+				i,
+				r.Name,
+				r.Description,
+				r.Default,
+				w.name,
+				w.description,
+				w.byDefault,
+			)
 		}
 	}
 }
@@ -200,14 +210,20 @@ func TestContractShortSubject(t *testing.T) {
 		{90, false, "exceeds 90"},
 		{200, false, "exceeds 90"},
 	} {
-		r := shortsubject.ValidateShortSubject(shortsubject.ShortSubjectRule, entry(strings.Repeat("s", c.length), "", parentA))
+		r := shortsubject.ValidateShortSubject(
+			shortsubject.ShortSubjectRule,
+			entry(strings.Repeat("s", c.length), "", parentA),
+		)
 		if r.Pass != c.pass || !strings.Contains(r.Msg, c.msg) {
 			t.Errorf("%d characters: pass %v %q, want %v with %q", c.length, r.Pass, r.Msg, c.pass, c.msg)
 		}
 	}
 
 	long := strings.Repeat("s", 200)
-	if r := shortsubject.ValidateShortSubject(shortsubject.ShortSubjectRule, entry(long, "", parentA, parentB)); !r.Pass {
+	if r := shortsubject.ValidateShortSubject(
+		shortsubject.ShortSubjectRule,
+		entry(long, "", parentA, parentB),
+	); !r.Pass {
 		t.Errorf("a merge commit with a long subject: %q, want a pass", r.Msg)
 	}
 }
@@ -242,7 +258,11 @@ func TestContractMessageRegexp(t *testing.T) {
 	}
 
 	blank := messageregexp.RegexpRule
-	if r := messageregexp.ValidateMessageRegexp(blank, entry("fix", "", parentA)); !r.Pass || !strings.Contains(r.Msg, "noop") {
+	if r := messageregexp.ValidateMessageRegexp(
+		blank,
+		entry("fix", "", parentA),
+	); !r.Pass ||
+		!strings.Contains(r.Msg, "noop") {
 		t.Errorf("a blank value: pass %v %q, want a noop pass", r.Pass, r.Msg)
 	}
 
@@ -275,5 +295,63 @@ func TestContractResultsCount(t *testing.T) {
 	half := validate.Commit(entry("short", "", parentA), rules)
 	if pass, fail := half.PassFail(); pass != 1 || fail != 1 {
 		t.Errorf("pass %d fail %d for one of two rules failing, want 1 and 1", pass, fail)
+	}
+}
+
+// TestContractSelectRulesRefusesAnUnknownName: SelectRules is --run's
+// selection with its refusal: a name no rule has is ErrUnknownRule, the
+// known names select as FilterRules does, and a message_regexp value that
+// does not compile is refused by CheckValue with the regexp's own error.
+func TestContractSelectRulesRefusesAnUnknownName(t *testing.T) {
+	t.Parallel()
+
+	if _, err := validate.SelectRules(
+		validate.RegisteredRules,
+		validate.SanitizeFilters("DCO,typo"),
+	); !errors.Is(
+		err,
+		validate.ErrUnknownRule,
+	) {
+		t.Errorf("SelectRules with a name no rule has: %v, want ErrUnknownRule", err)
+	}
+
+	rules, err := validate.SelectRules(validate.RegisteredRules, validate.SanitizeFilters("short-subject,dco"))
+	if err != nil || len(rules) != 2 || rules[0].Name != "DCO" || rules[1].Name != "short-subject" {
+		t.Errorf("SelectRules of two known names: %v, %v", rules, err)
+	}
+
+	if err := messageregexp.CheckValue("("); err == nil || !strings.Contains(err.Error(), "missing closing )") {
+		t.Errorf("CheckValue of an unbalanced regexp: %v, want the regexp's error", err)
+	}
+
+	if err := messageregexp.CheckValue("^JIRA-[0-9]+"); err != nil {
+		t.Errorf("CheckValue of a sound regexp: %v", err)
+	}
+}
+
+// TestContractCommitsToFixCountsCommits: CommitsToFix counts the commits
+// with a failing result, a commit failing two rules once.
+func TestContractCommitsToFixCountsCommits(t *testing.T) {
+	t.Parallel()
+
+	rules := validate.FilterRules(validate.RegisteredRules, validate.SanitizeFilters("DCO,short-subject"))
+
+	bad := entry(strings.Repeat("s", 95), "", parentA)
+	bad["commit"] = "1111111111111111111111111111111111111111"
+
+	good := entry("short", "Signed-off-by: A <a@example.com>", parentA)
+	good["commit"] = "2222222222222222222222222222222222222222"
+
+	var results validate.Results
+
+	results = append(results, validate.Commit(bad, rules)...)
+	results = append(results, validate.Commit(good, rules)...)
+
+	if n := results.CommitsToFix(); n != 1 {
+		t.Errorf("CommitsToFix %d for one commit failing two rules beside a clean one, want 1", n)
+	}
+
+	if _, fail := results.PassFail(); fail != 2 {
+		t.Errorf("PassFail counts %d failing results, want 2", fail)
 	}
 }

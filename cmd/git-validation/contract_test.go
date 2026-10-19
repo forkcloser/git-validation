@@ -4,14 +4,19 @@
 package main_test
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
+// binary is the command built once for every case.
+//
+//nolint:gochecknoglobals // built in TestMain, read by every test
 var binary string
 
 func TestMain(m *testing.M) {
@@ -20,17 +25,16 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	binary = filepath.Join(dir, "git-validation")
+	defer func() { _ = os.RemoveAll(dir) }()
 
-	build := exec.Command("go", "build", "-o", binary, ".")
+	binary = filepath.Join(dir, "git-validation"+exeSuffix())
+
+	build := exec.CommandContext(context.Background(), "go", "build", "-o", binary, ".")
 	if out, err := build.CombinedOutput(); err != nil {
 		panic(string(out))
 	}
 
-	code := m.Run()
-
-	_ = os.RemoveAll(dir)
-	os.Exit(code)
+	m.Run()
 }
 
 // repo is a fresh repository with a deterministic identity, every git call
@@ -71,15 +75,22 @@ func newRepo(t *testing.T) repo {
 	return r
 }
 
+// git runs git in the repository and returns its standard output trimmed;
+// what it says on standard error is the failure's message alone, never a
+// value a test parses (a host's git shim may warn there).
 func (r repo) git(args ...string) string {
 	r.t.Helper()
 
 	cmd := exec.CommandContext(r.t.Context(), "git", args...)
 	cmd.Dir = r.dir
 
-	out, err := cmd.CombinedOutput()
+	var stderr strings.Builder
+
+	cmd.Stderr = &stderr
+
+	out, err := cmd.Output()
 	if err != nil {
-		r.t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+		r.t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, stderr.String())
 	}
 
 	return strings.TrimSpace(string(out))
@@ -115,6 +126,7 @@ func (r repo) run(env []string, args ...string) (int, string) {
 
 	cmd := exec.CommandContext(r.t.Context(), binary, args...)
 	cmd.Dir = r.dir
+
 	cmd.Env = append(os.Environ(), env...)
 
 	var stderr strings.Builder
@@ -139,6 +151,8 @@ func (r repo) run(env []string, args ...string) (int, string) {
 
 // TestContractListRules: --list-rules prints every rule, quoted name and
 // description, in the registry's order, and exits 0.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractListRules(t *testing.T) {
 	r := newRepo(t)
 
@@ -159,6 +173,8 @@ func TestContractListRules(t *testing.T) {
 // and quoted subject and PASS or FAIL; a failing rule adds its reason on
 // an indented line; the run exits 1 when any commit fails, with the count
 // at the end, and 0 when none does.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractDefaultRunOverAHistory(t *testing.T) {
 	r := newRepo(t)
 
@@ -198,6 +214,8 @@ func TestContractDefaultRunOverAHistory(t *testing.T) {
 // TestContractVerboseAndQuiet: -v prints every rule's result under its
 // commit; -q prints nothing for a passing commit and one line per failing
 // rule, the hash and the reason.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractVerboseAndQuiet(t *testing.T) {
 	r := newRepo(t)
 
@@ -220,7 +238,9 @@ func TestContractVerboseAndQuiet(t *testing.T) {
 	}
 
 	code, out := r.run(nil, "-q")
-	if code != 1 || !strings.HasPrefix(out, " "+bad+" - FAIL - does not have a valid Developer Certificate of Origin") || strings.Contains(out, good) {
+	if code != 1 ||
+		!strings.HasPrefix(out, " "+bad+" - FAIL - does not have a valid Developer Certificate of Origin") ||
+		strings.Contains(out, good) {
 		t.Errorf("-q: exit %d, output:\n%s", code, out)
 	}
 
@@ -236,6 +256,8 @@ func TestContractVerboseAndQuiet(t *testing.T) {
 // TestContractRunSelectsRules: --run limits the run to the named rules,
 // so an unsigned commit passes a run of short-subject alone; message_regexp
 // with a value checks every commit against it.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractRunSelectsRules(t *testing.T) {
 	r := newRepo(t)
 
@@ -247,7 +269,8 @@ func TestContractRunSelectsRules(t *testing.T) {
 	}
 
 	code, out := r.run(nil, "--run", "message_regexp=^JIRA-[0-9]+", "-v")
-	if code != 1 || !strings.Contains(out, "\"JIRA-1 a change\" ... PASS") || !strings.Contains(out, "\"a change without a ticket\" ... FAIL") {
+	if code != 1 || !strings.Contains(out, "\"JIRA-1 a change\" ... PASS") ||
+		!strings.Contains(out, "\"a change without a ticket\" ... FAIL") {
 		t.Errorf("--run message_regexp: exit %d\n%s", code, out)
 	}
 }
@@ -255,6 +278,8 @@ func TestContractRunSelectsRules(t *testing.T) {
 // TestContractRangeAndDir: --range validates only the commits in the
 // range; --dir validates a repository elsewhere, the caller's directory
 // untouched.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractRangeAndDir(t *testing.T) {
 	r := newRepo(t)
 
@@ -281,6 +306,8 @@ func TestContractRangeAndDir(t *testing.T) {
 // GITHUB_SHA..HEAD unless --no-github; under Travis, TRAVIS_COMMIT_RANGE
 // with its three dots made two, and a non-pull-request build yields with
 // exit 0 unless --no-travis-pr-only.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractCIEnvironments(t *testing.T) {
 	r := newRepo(t)
 
@@ -317,10 +344,64 @@ func TestContractCIEnvironments(t *testing.T) {
 }
 
 // TestContractUsageErrorExitsOne: an unknown flag is a usage error, exit 1.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractUsageErrorExitsOne(t *testing.T) {
 	r := newRepo(t)
 
 	if code, _ := r.run(nil, "--nonesuch"); code != 1 {
 		t.Errorf("an unknown flag: exit %d, want 1", code)
 	}
+}
+
+// TestContractBadRegexpIsAUsageError: a message_regexp value that does not
+// compile is refused before any commit is validated: exit 1, no report
+// line on stdout.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
+func TestContractBadRegexpIsAUsageError(t *testing.T) {
+	r := newRepo(t)
+	r.commit("a", "a\n", "A change", true)
+
+	code, out := r.run(nil, "--run", "message_regexp=(")
+	if code != 1 || strings.Contains(out, " * ") {
+		t.Errorf("exit %d, stdout:\n%s", code, out)
+	}
+}
+
+// TestContractUnknownRuleIsRefused: a --run name no rule has is refused,
+// exit 1; no commit is reported PASS by a run of no rules.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
+func TestContractUnknownRuleIsRefused(t *testing.T) {
+	r := newRepo(t)
+	r.commit("a", "a\n", "A change", false)
+
+	code, out := r.run(nil, "--run", "typo")
+	if code != 1 || strings.Contains(out, "PASS") {
+		t.Errorf("exit %d, stdout:\n%s", code, out)
+	}
+}
+
+// TestContractCountIsOfCommits: the final line counts commits with a
+// failing rule, one commit failing two rules counted once.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
+func TestContractCountIsOfCommits(t *testing.T) {
+	r := newRepo(t)
+	r.commit("a", "a\n", strings.Repeat("x", 95), false)
+
+	_, out := r.run(nil)
+	if !strings.HasSuffix(out, "1 commits to fix\n") {
+		t.Errorf("stdout ends:\n%s", out)
+	}
+}
+
+// exeSuffix is what the OS needs appended to run a binary built to a bare name.
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+
+	return ""
 }

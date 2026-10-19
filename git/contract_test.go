@@ -49,12 +49,20 @@ func newRepo(t *testing.T) repo {
 	return r
 }
 
+// git runs git in the repository and returns its standard output trimmed;
+// standard error is the failure's message alone, never a parsed value.
 func (r repo) git(args ...string) string {
 	r.t.Helper()
 
-	out, err := exec.CommandContext(r.t.Context(), "git", args...).CombinedOutput()
+	cmd := exec.CommandContext(r.t.Context(), "git", args...)
+
+	var stderr strings.Builder
+
+	cmd.Stderr = &stderr
+
+	out, err := cmd.Output()
 	if err != nil {
-		r.t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+		r.t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, stderr.String())
 	}
 
 	return strings.TrimSpace(string(out))
@@ -82,10 +90,16 @@ func (r repo) commit(file string, content []byte, message string) string {
 // hashes, subject, body, author and committer, parents and tree as git
 // formats them, the body's CRLF folded to LF, every field trimmed; a root
 // commit has an empty parent, a merge commit two separated by a space.
+//
+//nolint:paralleltest // newRepo enters the repository with t.Chdir and t.Setenv
 func TestContractLogCommitIsGitsView(t *testing.T) {
 	r := newRepo(t)
 
-	first := r.commit("a", []byte("a\n"), "First subject\r\n\r\nFirst body line one\r\nline two  \r\n\r\nSigned-off-by: Test Author <author@example.com>\r\n")
+	first := r.commit(
+		"a",
+		[]byte("a\n"),
+		"First subject\r\n\r\nFirst body line one\r\nline two  \r\n\r\nSigned-off-by: Test Author <author@example.com>\r\n",
+	)
 	second := r.commit("b", []byte("b\n"), "Second subject")
 
 	e, err := git.LogCommit(first)
@@ -114,7 +128,8 @@ func TestContractLogCommitIsGitsView(t *testing.T) {
 		}
 	}
 
-	if (*e)["tree"] != "" || len((*e)["abbreviated_tree"]) < 7 || len((*e)["author_date"]) == 0 || len((*e)["committer_date"]) == 0 {
+	if (*e)["tree"] != "" || len((*e)["abbreviated_tree"]) < 7 || (*e)["author_date"] == "" ||
+		(*e)["committer_date"] == "" {
 		t.Errorf("tree, dates: %q %q %q", (*e)["abbreviated_tree"], (*e)["author_date"], (*e)["committer_date"])
 	}
 
@@ -124,7 +139,12 @@ func TestContractLogCommitIsGitsView(t *testing.T) {
 	}
 
 	if (*e2)["parent"] != first || (*e2)["abbreviated_parent"] != first[:7] || (*e2)["body"] != "" {
-		t.Errorf("second: parent %q abbreviated %q body %q", (*e2)["parent"], (*e2)["abbreviated_parent"], (*e2)["body"])
+		t.Errorf(
+			"second: parent %q abbreviated %q body %q",
+			(*e2)["parent"],
+			(*e2)["abbreviated_parent"],
+			(*e2)["body"],
+		)
 	}
 
 	r.git("checkout", "-q", "-b", "side", first)
@@ -148,6 +168,8 @@ func TestContractLogCommitIsGitsView(t *testing.T) {
 // history; an empty range lists nothing and errs nothing; a range git
 // cannot resolve falls back to the whole history, from the root commit to
 // HEAD, or to the root commit alone when it is the only one.
+//
+//nolint:paralleltest // newRepo enters the repository with t.Chdir and t.Setenv
 func TestContractCommitsListsARange(t *testing.T) {
 	r := newRepo(t)
 
