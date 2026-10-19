@@ -13,7 +13,7 @@ dist: .build/release
 
 # Twin of the `release` recipe in .limen/just/build-go.just. CGO off, so the
 # whole target matrix builds from one machine. Exactly the platforms
-# .aqua/aqua.yaml lists under checksum.supported_envs.
+# .hermetic/hermetic.yaml lists under checksum.supported_envs.
 builds:
   - id: git-validation
     main: ./cmd/git-validation
