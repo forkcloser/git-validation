@@ -19,8 +19,19 @@ type Runner struct {
 	CommitRange string // if this is empty, then it will default to FETCH_HEAD, then HEAD
 }
 
-// NewRunner returns an initiallized Runner.
+// NewRunner returns an initiallized Runner. A rule whose Check refuses its
+// Value is refused here, before any commit is read.
 func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (runner *Runner, err error) {
+	for _, rule := range rules {
+		if rule.Check == nil {
+			continue
+		}
+
+		if checkErr := rule.Check(rule.Value); checkErr != nil {
+			return nil, fmt.Errorf("rule %s: %w", rule.Name, checkErr)
+		}
+	}
+
 	newroot, err := filepath.Abs(root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path of %q: %w", root, err)

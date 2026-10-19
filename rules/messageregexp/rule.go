@@ -19,6 +19,17 @@ var RegexpRule = validate.Rule{
 	Description: "checks the commit message for a user provided regular expression",
 	Run:         ValidateMessageRegexp,
 	Default:     false, // only for users specifically calling it through -run ...
+	Check:       CheckValue,
+}
+
+// CheckValue refuses a value that is not a regular expression, with the
+// regexp package's own words; the run is refused before any commit is read.
+func CheckValue(value string) error {
+	if _, err := regexp.Compile(value); err != nil {
+		return fmt.Errorf("value does not compile: %w", err)
+	}
+
+	return nil
 }
 
 // ValidateMessageRegexp is the message regex func to run.
@@ -30,9 +41,18 @@ func ValidateMessageRegexp(r validate.Rule, c git.CommitEntry) (vr validate.Resu
 		return vr
 	}
 
-	re := regexp.MustCompile(r.Value)
-
 	vr.CommitEntry = c
+
+	// NewRunner refused the value already; a rule run on its own fails the
+	// commit with the reason rather than panicking.
+	re, err := regexp.Compile(r.Value)
+	if err != nil {
+		vr.Pass = false
+		vr.Msg = fmt.Sprintf("message_regexp value does not compile: %v", err)
+
+		return vr
+	}
+
 	if len(strings.Split(c["parent"], " ")) > 1 {
 		vr.Pass = true
 		vr.Msg = "merge commits are not checked for message_regexp"

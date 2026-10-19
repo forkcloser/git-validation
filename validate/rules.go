@@ -1,6 +1,8 @@
 package validate
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -36,13 +38,20 @@ type Rule struct {
 	Description string // longer Description for readability
 	Run         func(Rule, git.CommitEntry) Result
 	Default     bool // whether the registered rule is run by default
+	// Check refuses a Value the rule cannot run with, before any commit is
+	// read (NewRunner calls it); nil for a rule that takes no value.
+	Check func(value string) error
 }
 
-// Commit processes the given rules on the provided commit, and returns the result set.
+// Commit processes the given rules on the provided commit, and returns the
+// result set, every result carrying the commit (not every rule sets it).
 func Commit(c git.CommitEntry, rules []Rule) Results {
 	results := Results{}
+
 	for _, r := range rules {
-		results = append(results, r.Run(r, c))
+		res := r.Run(r, c)
+		res.CommitEntry = c
+		results = append(results, res)
 	}
 
 	return results
@@ -69,6 +78,19 @@ func (vr Results) PassFail() (pass, fail int) {
 	}
 
 	return pass, fail
+}
+
+// CommitsToFix is the number of commits with at least one failing result.
+func (vr Results) CommitsToFix() int {
+	failing := map[string]struct{}{}
+
+	for _, res := range vr {
+		if !res.Pass {
+			failing[res.CommitEntry["commit"]] = struct{}{}
+		}
+	}
+
+	return len(failing)
 }
 
 // SanitizeFilters takes a comma delimited list and returns the trimmend and
@@ -110,6 +132,29 @@ func FilterRules(rules []Rule, includes []string) []Rule {
 
 	return ret
 }
+
+// SelectRules is FilterRules refusing a name that selects no rule: a
+// misspelled name in -run would otherwise run nothing and pass every commit.
+// The error names the rule and lists the rules there are.
+func SelectRules(rules []Rule, includes []string) ([]Rule, error) {
+	for _, include := range includes {
+		name, _, _ := strings.Cut(include, "=")
+
+		if !slices.ContainsFunc(rules, func(r Rule) bool { return strings.EqualFold(r.Name, name) }) {
+			names := make([]string, 0, len(rules))
+			for _, r := range rules {
+				names = append(names, r.Name)
+			}
+
+			return nil, fmt.Errorf("%w %q; the rules are %s", ErrUnknownRule, name, strings.Join(names, ", "))
+		}
+	}
+
+	return FilterRules(rules, includes), nil
+}
+
+// ErrUnknownRule is a -run name no registered rule has.
+var ErrUnknownRule = errors.New("unknown rule")
 
 // StringsSliceEqual compares two string arrays for equality.
 func StringsSliceEqual(a, b []string) bool {

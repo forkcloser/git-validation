@@ -93,9 +93,15 @@ func run(flags *cli) error {
 			rules = append(rules, r)
 		}
 	}
-	// or reduce the set being run to what the user provided
+	// or reduce the set being run to what the user provided; a name no rule
+	// has is refused rather than running nothing and passing everything.
 	if flags.Run != "" {
-		rules = validate.FilterRules(validate.RegisteredRules, validate.SanitizeFilters(flags.Run))
+		var err error
+
+		rules, err = validate.SelectRules(validate.RegisteredRules, validate.SanitizeFilters(flags.Run))
+		if err != nil {
+			return fmt.Errorf("--run: %w", err)
+		}
 	}
 
 	slog.Debug("rules to run", "rules", ruleNames(rules))
@@ -115,7 +121,7 @@ func run(flags *cli) error {
 		}
 	}
 
-	slog.Info("using commit range", "range", commitRange)
+	slog.Debug("using commit range", "range", commitRange)
 
 	runner, err := validate.NewRunner(flags.Dir, rules, commitRange, flags.Verbose)
 	if err != nil {
@@ -126,8 +132,7 @@ func run(flags *cli) error {
 		return fmt.Errorf("validating commits: %w", err)
 	}
 
-	_, fail := runner.Results.PassFail()
-	if fail > 0 {
+	if fail := runner.Results.CommitsToFix(); fail > 0 {
 		fmt.Printf("%d commits to fix\n", fail)
 
 		return errCommitsToFix
