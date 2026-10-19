@@ -3,6 +3,7 @@ package validate
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -49,6 +50,8 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (run
 				return nil, err
 			}
 		}
+
+		slog.Debug("no commit range given, validating from", "commit", commitrange)
 	}
 
 	return &Runner{

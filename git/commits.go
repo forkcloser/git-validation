@@ -3,6 +3,7 @@ package git
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"slices"
@@ -23,7 +24,7 @@ func Commits(commitrange string) ([]CommitEntry, error) {
 
 	cmdArgs := []string{"git", "rev-list", commitrange}
 
-	output, err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Output()
+	output, err := command(cmdArgs[1:]...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
 	}
@@ -52,7 +53,7 @@ func Commits(commitrange string) ([]CommitEntry, error) {
 func checkRevList(commitrange string) (string, error) {
 	cmdArgs := []string{"git", "rev-list", commitrange}
 
-	_, err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Output()
+	_, err := command(cmdArgs[1:]...).Output()
 	if err == nil {
 		// no issues, return now
 		return commitrange, nil
@@ -60,7 +61,7 @@ func checkRevList(commitrange string) (string, error) {
 
 	cmdArgs = []string{"git", "log", "--pretty=oneline", "--no-show-signature"}
 
-	output, err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Output()
+	output, err := command(cmdArgs[1:]...).Output()
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
 	}
@@ -103,7 +104,7 @@ var FieldNames = map[string]string{
 }
 
 func gitVersion() (string, error) {
-	cmd := exec.Command("git", "version")
+	cmd := command("version")
 	cmd.Stderr = os.Stderr
 
 	buf, err := cmd.Output()
@@ -174,7 +175,8 @@ func Check(commit string) ([]byte, error) {
 	}
 
 	if len(logs) == 1 {
-		// The initial commit has no parent to check against.
+		slog.Debug("skipping the whitespace check of the initial commit, which has no parent", "commit", commit)
+
 		return []byte{}, nil
 	}
 
@@ -200,7 +202,7 @@ func Check(commit string) ([]byte, error) {
 		}
 	}
 
-	cmd := exec.Command("git", args...)
+	cmd := command(args...)
 
 	cmd.Stderr = os.Stderr
 
@@ -211,7 +213,7 @@ func Check(commit string) ([]byte, error) {
 //
 // NOTE: This could be expensive for very large commits.
 func Show(commit string) ([]byte, error) {
-	cmd := exec.Command("git", "--no-pager", "show", commit)
+	cmd := command("--no-pager", "show", commit)
 
 	cmd.Stderr = os.Stderr
 
@@ -224,7 +226,7 @@ type CommitEntry map[string]string
 
 // LogUntil returns the array of oneline commits from initial until the provided commit.
 func LogUntil(commit string) ([]string, error) {
-	cmd := exec.Command("git", "--no-pager", "log", "--oneline", "--no-show-signature", commit)
+	cmd := command("--no-pager", "log", "--oneline", "--no-show-signature", commit)
 
 	cmd.Stderr = os.Stderr
 
@@ -241,7 +243,7 @@ func LogCommit(commit string) (*CommitEntry, error) {
 	c := CommitEntry{}
 
 	for k, v := range FieldNames {
-		cmd := exec.Command("git", "--no-pager", "log", "-1", `--pretty=format:`+k+``, commit)
+		cmd := command("--no-pager", "log", "-1", `--pretty=format:`+k+``, commit)
 
 		cmd.Stderr = os.Stderr
 
@@ -261,7 +263,7 @@ func LogCommit(commit string) (*CommitEntry, error) {
 func FetchHeadCommit() (string, error) {
 	cmdArgs := []string{"git", "--no-pager", "rev-parse", "--verify", "FETCH_HEAD"}
 
-	output, err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Output()
+	output, err := command(cmdArgs[1:]...).Output()
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
 	}
@@ -273,10 +275,17 @@ func FetchHeadCommit() (string, error) {
 func HeadCommit() (string, error) {
 	cmdArgs := []string{"git", "--no-pager", "rev-parse", "--verify", "HEAD"}
 
-	output, err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Output()
+	output, err := command(cmdArgs[1:]...).Output()
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+// command returns the git command for args, recorded at debug level.
+func command(args ...string) *exec.Cmd {
+	slog.Debug("running git", "cmd", "git "+strings.Join(args, " "))
+
+	return exec.Command("git", args...)
 }
