@@ -34,8 +34,9 @@ type cli struct {
 }
 
 // errCommitsToFix is a run that found failing commits; they are printed
-// already, so the exit carries no message.
-var errCommitsToFix = shutdown.ExitError(1)
+// already, so the exit carries no message: it wraps the status shutdown.Run
+// exits with silently, in this program's words.
+var errCommitsToFix = fmt.Errorf("commits to fix: %w", shutdown.ExitError(1))
 
 func main() {
 	var flags cli
