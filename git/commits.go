@@ -48,8 +48,16 @@ func Commits(commitrange string) ([]CommitEntry, error) {
 	return commits, nil
 }
 
-// Since the commitrange requested may be longer than the depth being cloned in CI,
-// check for an error, if so do a git log to get the oldest available commit for a reduced range.
+// errRange is a --range git cannot resolve in a repository whose history is
+// whole: a typo, or a ref that is not there. It names the range.
+var errRange = errors.New("the commit range does not resolve")
+
+// checkRevList returns the range to validate. A range git resolves is
+// itself. One it does not resolve is an error in a repository with its
+// whole history; in a shallow clone, the CI case, the range's start may lie
+// past the depth fetched, and the run then covers what the clone has, from
+// its oldest commit. Before, every unresolvable range took that fallback,
+// so a typo validated the whole history and passed.
 func checkRevList(commitrange string) (string, error) {
 	cmdArgs := []string{"git", "rev-list", commitrange}
 
@@ -57,6 +65,18 @@ func checkRevList(commitrange string) (string, error) {
 	if err == nil {
 		// no issues, return now
 		return commitrange, nil
+	}
+
+	if !shallowRepository() {
+		// The git command that failed is named, and its exit unwraps, as
+		// every git failure here does; git's own words follow.
+		detail := ""
+
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && len(exitErr.Stderr) > 0 {
+			detail = " (" + strings.TrimSpace(string(exitErr.Stderr)) + ")"
+		}
+
+		return "", fmt.Errorf("%w: %s: %w%s", errRange, strings.Join(cmdArgs, " "), err, detail)
 	}
 
 	cmdArgs = []string{"git", "log", "--pretty=oneline", "--no-show-signature"}
@@ -76,6 +96,14 @@ func checkRevList(commitrange string) (string, error) {
 	lastCommit, _, _ := strings.Cut(chunks[len(chunks)-1], " ")
 
 	return lastCommit + "..HEAD", nil
+}
+
+// shallowRepository reports whether the repository was cloned with a depth,
+// so that its history may not reach a range's start.
+func shallowRepository() bool {
+	output, err := command("rev-parse", "--is-shallow-repository").Output()
+
+	return err == nil && strings.TrimSpace(string(output)) == "true"
 }
 
 // FieldNames are for the formating and rendering of the CommitEntry structs.

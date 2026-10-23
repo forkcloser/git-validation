@@ -192,7 +192,7 @@ func TestCommitsOutsideARepository(t *testing.T) {
 		t.Fatal("Commits outside a repository succeeded")
 	}
 
-	if !strings.Contains(err.Error(), "git log --pretty=oneline --no-show-signature") {
+	if !strings.Contains(err.Error(), "git rev-list HEAD~1..HEAD") {
 		t.Errorf("Commits error = %q, want it to name the git command", err)
 	}
 

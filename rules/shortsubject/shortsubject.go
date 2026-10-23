@@ -2,6 +2,7 @@ package shortsubject
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/forkcloser/git-validation/git"
 	"github.com/forkcloser/git-validation/validate"
@@ -29,7 +30,11 @@ func ValidateShortSubject(r validate.Rule, c git.CommitEntry) (vr validate.Resul
 		return vr
 	}
 
-	if len(c["subject"]) >= 90 {
+	// The limit is in characters, as GitHub's ellipsis and a reader count
+	// them; in bytes, 85 accented characters failed the rule.
+	length := utf8.RuneCountInString(c["subject"])
+
+	if length >= 90 {
 		vr.Pass = false
 		vr.Msg = "commit subject exceeds 90 characters"
 
@@ -37,7 +42,7 @@ func ValidateShortSubject(r validate.Rule, c git.CommitEntry) (vr validate.Resul
 	}
 
 	vr.Pass = true
-	if len(c["subject"]) > 72 {
+	if length > 72 {
 		vr.Msg = "commit subject is under 90 characters, but is still more than 72 chars"
 	} else {
 		vr.Msg = "commit subject is 72 characters or less! *yay*"
