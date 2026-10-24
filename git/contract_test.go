@@ -188,16 +188,28 @@ func TestContractCommitsListsARange(t *testing.T) {
 	}
 
 	for _, c := range []struct {
-		rng  string
-		want []string
+		rng     string
+		want    []string
+		refused bool
 	}{
-		{hashes[1] + ".." + hashes[3], []string{"Subject 3", "Subject 2"}},
-		{hashes[3], []string{"Subject 3", "Subject 2", "Subject 1", "Subject 0"}},
-		{"HEAD", []string{"Subject 3", "Subject 2", "Subject 1", "Subject 0"}},
-		{hashes[3] + ".." + hashes[3], nil},
-		{"nonesuch..HEAD", []string{"Subject 3", "Subject 2", "Subject 1"}},
+		{hashes[1] + ".." + hashes[3], []string{"Subject 3", "Subject 2"}, false},
+		{hashes[3], []string{"Subject 3", "Subject 2", "Subject 1", "Subject 0"}, false},
+		{"HEAD", []string{"Subject 3", "Subject 2", "Subject 1", "Subject 0"}, false},
+		{hashes[3] + ".." + hashes[3], nil, false},
+		// A range git cannot resolve is an error naming it in a repository
+		// with its whole history; it used to validate the whole history.
+		{"nonesuch..HEAD", nil, true},
 	} {
 		got, err := git.Commits(c.rng)
+		if c.refused {
+			// The range, and git's own words on it.
+			if err == nil || !strings.Contains(err.Error(), c.rng) || !strings.Contains(err.Error(), "fatal:") {
+				t.Errorf("%s: error %v, want one naming the range with git's message", c.rng, err)
+			}
+
+			continue
+		}
+
 		if err != nil {
 			t.Errorf("%s: %v", c.rng, err)
 
