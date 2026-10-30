@@ -48,54 +48,66 @@ func Commits(commitrange string) ([]CommitEntry, error) {
 	return commits, nil
 }
 
-// errRange is a --range git cannot resolve in a repository whose history is
-// whole: a typo, or a ref that is not there. It names the range.
+// errRange is a --range git cannot resolve: a typo, a ref that is not
+// there, or a start past the depth of a shallow clone. It names the range.
 var errRange = errors.New("the commit range does not resolve")
 
-// checkRevList returns the range to validate. A range git resolves is
-// itself. One it does not resolve is an error in a repository with its
-// whole history; in a shallow clone, the CI case, the range's start may lie
-// past the depth fetched, and the run then covers what the clone has, from
-// its oldest commit. Before, every unresolvable range took that fallback,
-// so a typo validated the whole history and passed.
+// checkRevList returns the range to validate: the range itself, once git
+// resolves it. One git does not resolve is an error. Before, it validated
+// what the repository had, so a typo, or a shallow clone whose depth did not
+// reach the range's start, validated the whole history and passed. In a
+// shallow clone the error says what to fetch.
 func checkRevList(commitrange string) (string, error) {
 	cmdArgs := []string{"git", "rev-list", commitrange}
 
 	_, err := command(cmdArgs[1:]...).Output()
 	if err == nil {
-		// no issues, return now
 		return commitrange, nil
 	}
 
-	if !shallowRepository() {
-		// The git command that failed is named, and its exit unwraps, as
-		// every git failure here does; git's own words follow.
-		detail := ""
+	// The git command that failed is named, and its exit unwraps, as every
+	// git failure here does; git's own words follow.
+	detail := ""
 
-		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && len(exitErr.Stderr) > 0 {
-			detail = " (" + strings.TrimSpace(string(exitErr.Stderr)) + ")"
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && len(exitErr.Stderr) > 0 {
+		detail = " (" + strings.TrimSpace(string(exitErr.Stderr)) + ")"
+	}
+
+	if shallowRepository() {
+		detail += "; the repository is a shallow clone"
+
+		// A typo and an end past the depth look the same from here: both
+		// are not in the clone.
+		switch missing := missingEnds(commitrange); len(missing) {
+		case 0:
+		case 1:
+			detail += " and " + missing[0] + " is not in it"
+		default:
+			detail += " and " + strings.Join(missing, " and ") + " are not in it"
 		}
 
-		return "", fmt.Errorf("%w: %s: %w%s", errRange, strings.Join(cmdArgs, " "), err, detail)
+		detail += ": fetch more history (actions/checkout fetch-depth: 0, git fetch --deepen=<n> or --unshallow)"
 	}
 
-	cmdArgs = []string{"git", "log", "--pretty=oneline", "--no-show-signature"}
+	return "", fmt.Errorf("%w: %s: %w%s", errRange, strings.Join(cmdArgs, " "), err, detail)
+}
 
-	output, err := command(cmdArgs[1:]...).Output()
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
+// missingEnds returns the ends of a range (a..b, a...b, or a single revision)
+// that do not name a commit the repository has.
+func missingEnds(commitrange string) []string {
+	var missing []string
+
+	for end := range strings.SplitSeq(strings.ReplaceAll(commitrange, "...", ".."), "..") {
+		if end == "" {
+			continue
+		}
+
+		if err := command("rev-parse", "--verify", "--quiet", end+"^{commit}").Run(); err != nil {
+			missing = append(missing, end)
+		}
 	}
-	// This "output" is now the list of available commits and short description.
-	// We want the last commit hash only.. (i.e. `| tail -n1 | awk '{ print $1 }'`)
-	chunks := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(chunks) == 1 {
-		commit, _, _ := strings.Cut(chunks[0], " ")
-		return commit, nil
-	}
 
-	lastCommit, _, _ := strings.Cut(chunks[len(chunks)-1], " ")
-
-	return lastCommit + "..HEAD", nil
+	return missing
 }
 
 // shallowRepository reports whether the repository was cloned with a depth,
