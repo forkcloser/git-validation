@@ -4,8 +4,8 @@ package main_test
 // behaviour before them: the short-subject rule counts characters, not
 // bytes, so a subject of 89 non-ASCII characters passes and one of 90
 // fails; and a --range git cannot resolve is an error naming the range,
-// with nothing validated, where a shallow clone whose history does not
-// reach the range's start still runs over what it has.
+// with nothing validated, in a shallow clone whose history does not reach
+// the range's start as well, where the error says what to fetch.
 
 import (
 	"os"
@@ -70,11 +70,13 @@ func TestContractUnresolvableRangeIsAnError(t *testing.T) {
 	}
 }
 
-// A shallow clone's history may not reach the range's start a CI
-// configuration names; the run then covers what the clone has, as before.
+// A shallow clone whose history does not reach the range's start a CI
+// configuration names is refused like any unresolvable range, nothing
+// validated, and the error says what to fetch; it used to run over what the
+// clone had, so a depth of one validated the head commit alone and passed.
 //
 //nolint:paralleltest // newRepo sets the environment with t.Setenv
-func TestContractShallowCloneRunsOverWhatItHas(t *testing.T) {
+func TestContractShallowCloneRefusesARangeOutOfReach(t *testing.T) {
 	r := newRepo(t)
 
 	r.commit("a", "a\n", "Root", true)
@@ -82,19 +84,65 @@ func TestContractShallowCloneRunsOverWhatItHas(t *testing.T) {
 	r.commit("b", "b\n", "Second", true)
 	r.commit("c", "c\n", "Third", true)
 
-	shallow := filepath.Join(t.TempDir(), "shallow")
+	shallow := shallowClone(t, r.dir, "1")
 
-	clone := exec.CommandContext(t.Context(), "git", "clone", "-q", "--depth", "1", "file://"+r.dir, shallow)
-	if out, err := clone.CombinedOutput(); err != nil {
-		t.Fatalf("shallow clone: %v\n%s", err, out)
+	cmd := exec.CommandContext(t.Context(), binary, "--dir", shallow, "--range", base+"..HEAD")
+	cmd.Dir = shallow
+	cmd.Env = os.Environ()
+
+	var stderr strings.Builder
+
+	cmd.Stderr = &stderr
+
+	out, err := cmd.Output()
+	if err == nil {
+		t.Fatalf("a range past the clone's depth validated what the clone has:\n%s", out)
 	}
+
+	if strings.Contains(string(out), " * ") {
+		t.Errorf("commits were validated under a range past the clone's depth:\n%s", out)
+	}
+
+	for _, want := range []string{base + " is not in it", "shallow clone", "fetch-depth: 0", "--unshallow"} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Errorf("the error does not say %q:\n%s", want, stderr.String())
+		}
+	}
+}
+
+// A shallow clone deep enough for the range runs as a whole clone does.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
+func TestContractShallowCloneWithTheRangeInReachRuns(t *testing.T) {
+	r := newRepo(t)
+
+	r.commit("a", "a\n", "Root", true)
+	base := r.git("rev-parse", "HEAD")
+	r.commit("b", "b\n", "Second", true)
+	r.commit("c", "c\n", "Third", true)
+
+	shallow := shallowClone(t, r.dir, "3")
 
 	cmd := exec.CommandContext(t.Context(), binary, "--dir", shallow, "--range", base+"..HEAD")
 	cmd.Dir = shallow
 	cmd.Env = os.Environ()
 
 	out, err := cmd.Output()
-	if err != nil || !strings.Contains(string(out), "PASS") {
-		t.Errorf("shallow clone: %v\n%s", err, out)
+	if err != nil || strings.Count(string(out), "PASS") != 2 {
+		t.Errorf("shallow clone deep enough for the range: %v\n%s", err, out)
 	}
+}
+
+// shallowClone clones dir with the given depth and returns the clone's path.
+func shallowClone(t *testing.T, dir, depth string) string {
+	t.Helper()
+
+	shallow := filepath.Join(t.TempDir(), "shallow")
+
+	clone := exec.CommandContext(t.Context(), "git", "clone", "-q", "--depth", depth, "file://"+dir, shallow)
+	if out, err := clone.CombinedOutput(); err != nil {
+		t.Fatalf("shallow clone: %v\n%s", err, out)
+	}
+
+	return shallow
 }
