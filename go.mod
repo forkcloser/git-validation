@@ -3,7 +3,7 @@ module github.com/forkcloser/git-validation
 go 1.26.0
 
 require (
-	github.com/alecthomas/kong v1.16.1
+	github.com/alecthomas/kong v1.17.0
 	github.com/mycophonic/primordium v0.15.1
 )
 
