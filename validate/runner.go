@@ -11,17 +11,22 @@ import (
 )
 
 // Runner is the for processing a set of rules against a range of commits.
+// A run writes nothing to standard output and does not read QUIET: what it
+// found is in Results, and a caller that wants to follow the run sets Report.
 type Runner struct {
 	Root        string
 	Rules       []Rule
 	Results     Results
-	Verbose     bool
 	CommitRange string // if this is empty, then it will default to FETCH_HEAD, then HEAD
+	// Report, when set, is called by Run with each commit and the results of
+	// its rules, as soon as the commit is validated and in the range's order;
+	// Results holds them already.
+	Report func(commit git.CommitEntry, results Results)
 }
 
 // NewRunner returns an initiallized Runner. A rule whose Check refuses its
 // Value is refused here, before any commit is read.
-func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (runner *Runner, err error) {
+func NewRunner(root string, rules []Rule, commitrange string) (runner *Runner, err error) {
 	for _, rule := range rules {
 		if rule.Check == nil {
 			continue
@@ -69,11 +74,11 @@ func NewRunner(root string, rules []Rule, commitrange string, verbose bool) (run
 		Root:        newroot,
 		Rules:       rules,
 		CommitRange: commitrange,
-		Verbose:     verbose,
 	}, nil
 }
 
-// Run processes the rules for each commit in the range provided.
+// Run processes the rules for each commit in the range provided, appending
+// every result to Results.
 func (r *Runner) Run() (err error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -95,45 +100,12 @@ func (r *Runner) Run() (err error) {
 		return err
 	}
 
-	// run them and show results
 	for _, commit := range c {
-		if os.Getenv("QUIET") == "" {
-			fmt.Printf(" * %s %q ... ", commit["abbreviated_commit"], commit["subject"])
-		}
-
 		vr := Commit(commit, r.Rules)
 		r.Results = append(r.Results, vr...)
 
-		_, fail := vr.PassFail()
-		if os.Getenv("QUIET") != "" {
-			if fail != 0 {
-				for _, res := range vr {
-					if !res.Pass {
-						fmt.Printf(" %s - FAIL - %s\n", commit["abbreviated_commit"], res.Msg)
-					}
-				}
-			}
-			// everything else in the loop is printing output.
-			// If we're quiet, then just continue
-			continue
-		}
-
-		if fail == 0 {
-			fmt.Println("PASS")
-		} else {
-			fmt.Println("FAIL")
-		}
-
-		for _, res := range vr {
-			if r.Verbose {
-				if res.Pass {
-					fmt.Printf("  - PASS - %s\n", res.Msg)
-				} else {
-					fmt.Printf("  - FAIL - %s\n", res.Msg)
-				}
-			} else if !res.Pass {
-				fmt.Printf("  - FAIL - %s\n", res.Msg)
-			}
+		if r.Report != nil {
+			r.Report(commit, vr)
 		}
 	}
 

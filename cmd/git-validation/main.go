@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/mycophonic/primordium/app/logger"
 	"github.com/mycophonic/primordium/app/shutdown"
 
+	"github.com/forkcloser/git-validation/git"
 	_ "github.com/forkcloser/git-validation/rules/danglingwhitespace"
 	_ "github.com/forkcloser/git-validation/rules/dco"
 	_ "github.com/forkcloser/git-validation/rules/messageregexp"
@@ -66,12 +68,6 @@ func main() {
 }
 
 func run(flags *cli) error {
-	if flags.Quiet {
-		if err := os.Setenv("QUIET", "1"); err != nil {
-			return fmt.Errorf("quiet output: %w", err)
-		}
-	}
-
 	if flags.ListRules {
 		for _, r := range validate.RegisteredRules {
 			fmt.Printf("%q -- %s\n", r.Name, r.Description)
@@ -124,9 +120,13 @@ func run(flags *cli) error {
 
 	slog.Debug("using commit range", "range", commitRange)
 
-	runner, err := validate.NewRunner(flags.Dir, rules, commitRange, flags.Verbose)
+	runner, err := validate.NewRunner(flags.Dir, rules, commitRange)
 	if err != nil {
 		return fmt.Errorf("preparing the run: %w", err)
+	}
+
+	runner.Report = func(commit git.CommitEntry, results validate.Results) {
+		report(os.Stdout, commit, results, flags.Verbose, flags.Quiet)
 	}
 
 	if err := runner.Run(); err != nil {
@@ -140,6 +140,40 @@ func run(flags *cli) error {
 	}
 
 	return nil
+}
+
+// report prints one commit's results: the commit and its verdict, then each
+// failing rule, and each passing one under verbose. Quiet prints nothing for
+// a passing commit and one line per failing rule, the hash and the reason,
+// whatever verbose says.
+func report(out io.Writer, commit git.CommitEntry, results validate.Results, verbose, quiet bool) {
+	_, fail := results.PassFail()
+
+	if quiet {
+		for _, res := range results {
+			if !res.Pass {
+				_, _ = fmt.Fprintf(out, " %s - FAIL - %s\n", commit["abbreviated_commit"], res.Msg)
+			}
+		}
+
+		return
+	}
+
+	verdict := "PASS"
+	if fail != 0 {
+		verdict = "FAIL"
+	}
+
+	_, _ = fmt.Fprintf(out, " * %s %q ... %s\n", commit["abbreviated_commit"], commit["subject"], verdict)
+
+	for _, res := range results {
+		switch {
+		case !res.Pass:
+			_, _ = fmt.Fprintf(out, "  - FAIL - %s\n", res.Msg)
+		case verbose:
+			_, _ = fmt.Fprintf(out, "  - PASS - %s\n", res.Msg)
+		}
+	}
 }
 
 // configureLogger installs the process-wide slog handler through primordium:

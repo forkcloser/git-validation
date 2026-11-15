@@ -213,7 +213,8 @@ func TestContractDefaultRunOverAHistory(t *testing.T) {
 
 // TestContractVerboseAndQuiet: -v prints every rule's result under its
 // commit; -q prints nothing for a passing commit and one line per failing
-// rule, the hash and the reason.
+// rule, the hash and the reason, with -v or without; QUIET in the
+// environment is not -q.
 //
 //nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractVerboseAndQuiet(t *testing.T) {
@@ -242,6 +243,18 @@ func TestContractVerboseAndQuiet(t *testing.T) {
 		!strings.HasPrefix(out, " "+bad+" - FAIL - does not have a valid Developer Certificate of Origin") ||
 		strings.Contains(out, good) {
 		t.Errorf("-q: exit %d, output:\n%s", code, out)
+	}
+
+	// -q wins over -v: the two together give the quiet report.
+	_, quiet := r.run(nil, "-q")
+	if _, both := r.run(nil, "-q", "-v"); both != quiet {
+		t.Errorf("-q -v:\n%s\nwant the -q report:\n%s", both, quiet)
+	}
+
+	// Quiet is the flag's alone: QUIET in the environment changes nothing.
+	_, plain := r.run(nil)
+	if _, withEnv := r.run([]string{"QUIET=1"}); withEnv != plain || !strings.Contains(plain, good) {
+		t.Errorf("QUIET=1 without -q:\n%s\nwant the plain report:\n%s", withEnv, plain)
 	}
 
 	// Every failing rule of a commit is printed under -q, not the first.
