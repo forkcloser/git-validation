@@ -1,6 +1,7 @@
 package danglingwhitespace
 
 import (
+	"context"
 	"errors"
 	"os/exec"
 
@@ -26,12 +27,12 @@ func init() {
 }
 
 // ValidateDanglingWhitespace runs Git's check to look for whitespace errors.
-func ValidateDanglingWhitespace(r validate.Rule, c git.CommitEntry) (vr validate.Result) {
+func ValidateDanglingWhitespace(ctx context.Context, r validate.Rule, c git.CommitEntry) (vr validate.Result) {
 	vr.CommitEntry = c
 	vr.Msg = "commit does not have any whitespace errors"
 	vr.Pass = true
 
-	_, err := git.Check(c["commit"])
+	_, err := git.Check(ctx, c["commit"])
 	if err != nil {
 		vr.Pass = false
 

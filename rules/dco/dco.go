@@ -1,6 +1,7 @@
 package dco
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
@@ -25,7 +26,7 @@ var (
 )
 
 // ValidateDCO checks that the commit has been signed off, per the DCO process.
-func ValidateDCO(r validate.Rule, c git.CommitEntry) (vr validate.Result) {
+func ValidateDCO(_ context.Context, r validate.Rule, c git.CommitEntry) (vr validate.Result) {
 	vr.CommitEntry = c
 	if len(strings.Split(c["parent"], " ")) > 1 {
 		vr.Pass = true

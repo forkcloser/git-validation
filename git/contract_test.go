@@ -102,7 +102,7 @@ func TestContractLogCommitIsGitsView(t *testing.T) {
 	)
 	second := r.commit("b", []byte("b\n"), "Second subject")
 
-	e, err := git.LogCommit(first)
+	e, err := git.LogCommit(t.Context(), first)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestContractLogCommitIsGitsView(t *testing.T) {
 		t.Errorf("tree, dates: %q %q %q", (*e)["abbreviated_tree"], (*e)["author_date"], (*e)["committer_date"])
 	}
 
-	e2, err := git.LogCommit(second)
+	e2, err := git.LogCommit(t.Context(), second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestContractLogCommitIsGitsView(t *testing.T) {
 	r.git("merge", "-q", "--no-ff", "--no-edit", "side")
 	merge := r.git("rev-parse", "HEAD")
 
-	m, err := git.LogCommit(merge)
+	m, err := git.LogCommit(t.Context(), merge)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestContractCommitsListsARange(t *testing.T) {
 		// with its whole history; it used to validate the whole history.
 		{"nonesuch..HEAD", nil, true},
 	} {
-		got, err := git.Commits(c.rng)
+		got, err := git.Commits(t.Context(), c.rng)
 		if c.refused {
 			// The range, and git's own words on it.
 			if err == nil || !strings.Contains(err.Error(), c.rng) || !strings.Contains(err.Error(), "fatal:") {
@@ -221,11 +221,11 @@ func TestContractCommitsListsARange(t *testing.T) {
 		}
 	}
 
-	if head, err := git.HeadCommit(); err != nil || head != hashes[3] {
+	if head, err := git.HeadCommit(t.Context()); err != nil || head != hashes[3] {
 		t.Errorf("HeadCommit %q %v, want %s", head, err, hashes[3])
 	}
 
-	if _, err := git.FetchHeadCommit(); err == nil {
+	if _, err := git.FetchHeadCommit(t.Context()); err == nil {
 		t.Error("FetchHeadCommit with no fetch ever made: no error")
 	}
 }
@@ -248,15 +248,15 @@ func TestContractCheckFindsWhitespaceErrors(t *testing.T) {
 
 	vendored := r.commit(filepath.Join("vendor", "d.txt"), []byte("vendored \n"), "Vendored")
 
-	if _, err := git.Check(root); err != nil {
+	if _, err := git.Check(t.Context(), root); err != nil {
 		t.Errorf("the root commit: %v, want it skipped", err)
 	}
 
-	if _, err := git.Check(clean); err != nil {
+	if _, err := git.Check(t.Context(), clean); err != nil {
 		t.Errorf("a clean commit: %v", err)
 	}
 
-	_, err := git.Check(dirty)
+	_, err := git.Check(t.Context(), dirty)
 	if err == nil {
 		t.Fatal("a commit adding trailing whitespace: no error")
 	}
@@ -266,17 +266,17 @@ func TestContractCheckFindsWhitespaceErrors(t *testing.T) {
 		t.Errorf("a commit adding trailing whitespace: %v, want git's exit status 2", err)
 	}
 
-	if _, err := git.Check(vendored); err == nil {
+	if _, err := git.Check(t.Context(), vendored); err == nil {
 		t.Error("a vendored file with trailing whitespace, no exclusion: no error")
 	}
 
 	t.Setenv("GIT_CHECK_EXCLUDE", "./vendor::./nonesuch")
 
-	if _, err := git.Check(vendored); err != nil {
+	if _, err := git.Check(t.Context(), vendored); err != nil {
 		t.Errorf("a vendored file with trailing whitespace, vendor excluded: %v", err)
 	}
 
-	if _, err := git.Check(dirty); err == nil {
+	if _, err := git.Check(t.Context(), dirty); err == nil {
 		t.Error("the dirty commit outside the excluded paths: no error")
 	}
 }

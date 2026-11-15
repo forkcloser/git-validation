@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -36,7 +37,7 @@ type Rule struct {
 	Name        string // short name for reference in the `-run=...` flag
 	Value       string // value to configure for the rule (i.e. a regexp to check for in the commit message)
 	Description string // longer Description for readability
-	Run         func(Rule, git.CommitEntry) Result
+	Run         func(context.Context, Rule, git.CommitEntry) Result
 	Default     bool // whether the registered rule is run by default
 	// Check refuses a Value the rule cannot run with, before any commit is
 	// read (NewRunner calls it); nil for a rule that takes no value.
@@ -45,11 +46,11 @@ type Rule struct {
 
 // Commit processes the given rules on the provided commit, and returns the
 // result set, every result carrying the commit (not every rule sets it).
-func Commit(c git.CommitEntry, rules []Rule) Results {
+func Commit(ctx context.Context, c git.CommitEntry, rules []Rule) Results {
 	results := Results{}
 
 	for _, r := range rules {
-		res := r.Run(r, c)
+		res := r.Run(ctx, r, c)
 		res.CommitEntry = c
 		results = append(results, res)
 	}

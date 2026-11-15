@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -155,10 +156,10 @@ func TestCommitsToFix(t *testing.T) {
 // return.
 func TestCommitStampsTheEntry(t *testing.T) {
 	entry := git.CommitEntry{"commit": "1111"}
-	fail := func(Rule, git.CommitEntry) Result { return Result{Pass: false, Msg: "no"} }
+	fail := func(context.Context, Rule, git.CommitEntry) Result { return Result{Pass: false, Msg: "no"} }
 	rules := []Rule{{Name: "a", Run: fail}, {Name: "b", Run: fail}}
 
-	results := Commit(entry, rules)
+	results := Commit(t.Context(), entry, rules)
 	if len(results) != 2 {
 		t.Fatalf("Commit returned %d results, want 2", len(results))
 	}

@@ -1,6 +1,7 @@
 package messageregexp
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -33,7 +34,7 @@ func CheckValue(value string) error {
 }
 
 // ValidateMessageRegexp is the message regex func to run.
-func ValidateMessageRegexp(r validate.Rule, c git.CommitEntry) (vr validate.Result) {
+func ValidateMessageRegexp(_ context.Context, r validate.Rule, c git.CommitEntry) (vr validate.Result) {
 	if r.Value == "" {
 		vr.Pass = true
 		vr.Msg = "noop: message_regexp value is blank"

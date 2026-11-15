@@ -19,18 +19,18 @@ import (
 func TestCommitEntry(t *testing.T) {
 	newRepository(t, "first commit", "second commit")
 
-	head, err := HeadCommit()
+	head, err := HeadCommit(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	commits, err := Commits(head)
+	commits, err := Commits(t.Context(), head)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if len(commits) != 2 {
-		t.Fatalf("Commits(HEAD) = %d commits, want 2", len(commits))
+		t.Fatalf("Commits(t.Context(), HEAD) = %d commits, want 2", len(commits))
 	}
 
 	for _, commit := range commits {
@@ -64,12 +64,12 @@ func TestCommandsAreRecordedAtDebug(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&records, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(previous) })
 
-	head, err := HeadCommit()
+	head, err := HeadCommit(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := Check(head); err != nil {
+	if _, err := Check(t.Context(), head); err != nil {
 		t.Fatal(err)
 	}
 
@@ -187,7 +187,7 @@ func TestCommitsOutsideARepository(t *testing.T) {
 	// No repository above it either.
 	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
 
-	_, err := Commits("HEAD~1..HEAD")
+	_, err := Commits(t.Context(), "HEAD~1..HEAD")
 	if err == nil {
 		t.Fatal("Commits outside a repository succeeded")
 	}

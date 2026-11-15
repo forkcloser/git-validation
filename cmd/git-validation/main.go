@@ -62,12 +62,12 @@ func main() {
 
 	// shutdown runs the command and exits with the status an ExitError asks
 	// for, silently, and 1 for any other error, which it logs.
-	shutdown.Run(shutdown.SetDefaults(context.Background()), func(context.Context) error {
-		return run(&flags)
+	shutdown.Run(shutdown.SetDefaults(context.Background()), func(ctx context.Context) error {
+		return run(ctx, &flags)
 	})
 }
 
-func run(flags *cli) error {
+func run(ctx context.Context, flags *cli) error {
 	if flags.ListRules {
 		for _, r := range validate.RegisteredRules {
 			fmt.Printf("%q -- %s\n", r.Name, r.Description)
@@ -101,7 +101,7 @@ func run(flags *cli) error {
 		}
 	}
 
-	slog.Debug("rules to run", "rules", ruleNames(rules))
+	slog.DebugContext(ctx, "rules to run", "rules", ruleNames(rules))
 
 	commitRange := flags.Range
 	if commitRange == "" {
@@ -118,9 +118,9 @@ func run(flags *cli) error {
 		}
 	}
 
-	slog.Debug("using commit range", "range", commitRange)
+	slog.DebugContext(ctx, "using commit range", "range", commitRange)
 
-	runner, err := validate.NewRunner(flags.Dir, rules, commitRange)
+	runner, err := validate.NewRunner(ctx, flags.Dir, rules, commitRange)
 	if err != nil {
 		return fmt.Errorf("preparing the run: %w", err)
 	}
@@ -129,7 +129,7 @@ func run(flags *cli) error {
 		report(os.Stdout, commit, results, flags.Verbose, flags.Quiet)
 	}
 
-	if err := runner.Run(); err != nil {
+	if err := runner.Run(ctx); err != nil {
 		return fmt.Errorf("validating commits: %w", err)
 	}
 
