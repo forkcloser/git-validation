@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,7 +27,7 @@ type Runner struct {
 
 // NewRunner returns an initiallized Runner. A rule whose Check refuses its
 // Value is refused here, before any commit is read.
-func NewRunner(root string, rules []Rule, commitrange string) (runner *Runner, err error) {
+func NewRunner(ctx context.Context, root string, rules []Rule, commitrange string) (runner *Runner, err error) {
 	for _, rule := range rules {
 		if rule.Check == nil {
 			continue
@@ -59,15 +60,15 @@ func NewRunner(root string, rules []Rule, commitrange string) (runner *Runner, e
 			return nil, fmt.Errorf("entering %q: %w", newroot, err)
 		}
 
-		commitrange, err = git.FetchHeadCommit()
+		commitrange, err = git.FetchHeadCommit(ctx)
 		if err != nil {
-			commitrange, err = git.HeadCommit()
+			commitrange, err = git.HeadCommit(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("finding a commit to validate from in %q: %w", newroot, err)
 			}
 		}
 
-		slog.Debug("no commit range given, validating from", "commit", commitrange)
+		slog.DebugContext(ctx, "no commit range given, validating from", "commit", commitrange)
 	}
 
 	return &Runner{
@@ -78,8 +79,10 @@ func NewRunner(root string, rules []Rule, commitrange string) (runner *Runner, e
 }
 
 // Run processes the rules for each commit in the range provided, appending
-// every result to Results.
-func (r *Runner) Run() (err error) {
+// every result to Results. When ctx ends it stops and returns the context's
+// error: Results holds the commits validated whole before that, and nothing
+// of the one it was at.
+func (r *Runner) Run(ctx context.Context) (err error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("finding the working directory: %w", err)
@@ -95,13 +98,24 @@ func (r *Runner) Run() (err error) {
 	}
 
 	// collect the entries
-	c, err := git.Commits(r.CommitRange)
+	c, err := git.Commits(ctx, r.CommitRange)
 	if err != nil {
 		return fmt.Errorf("listing the commits of %q: %w", r.CommitRange, err)
 	}
 
 	for _, commit := range c {
-		vr := Commit(commit, r.Rules)
+		if err = ctx.Err(); err != nil {
+			return fmt.Errorf("stopped before %s: %w", commit["abbreviated_commit"], err)
+		}
+
+		vr := Commit(ctx, commit, r.Rules)
+
+		// A rule that was stopped has not judged the commit: what it
+		// returned is the stop, and is not a result.
+		if err = ctx.Err(); err != nil {
+			return fmt.Errorf("stopped at %s: %w", commit["abbreviated_commit"], err)
+		}
+
 		r.Results = append(r.Results, vr...)
 
 		if r.Report != nil {

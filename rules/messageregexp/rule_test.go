@@ -41,14 +41,14 @@ func TestRunWithoutCheckFailsTheCommit(t *testing.T) {
 	rule := validate.Rule{Name: "message_regexp", Value: "("}
 	commit := git.CommitEntry{"commit": "1111", "subject": "(", "body": "", "parent": "0000"}
 
-	got := messageregexp.ValidateMessageRegexp(rule, commit)
+	got := messageregexp.ValidateMessageRegexp(t.Context(), rule, commit)
 	if got.Pass || !strings.Contains(got.Msg, "message_regexp value does not compile") {
 		t.Errorf("Run with \"(\": pass=%v msg=%q", got.Pass, got.Msg)
 	}
 
 	rule.Value = "^\\("
 
-	if got := messageregexp.ValidateMessageRegexp(rule, commit); !got.Pass {
+	if got := messageregexp.ValidateMessageRegexp(t.Context(), rule, commit); !got.Pass {
 		t.Errorf("Run with a matching value: pass=%v msg=%q", got.Pass, got.Msg)
 	}
 }

@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,16 +16,18 @@ import (
 // If commitrange is a git still range 12345...54321, then it will be isolated set of commits.
 // If commitrange is a single commit, all ancestor commits up through the hash provided.
 // If commitrange is an empty commit range, then nil is returned.
-func Commits(commitrange string) ([]CommitEntry, error) {
+func Commits(ctx context.Context, commitrange string) ([]CommitEntry, error) {
 	// TEST if it has _enough_ of a range from rev-list
-	commitrange, err := checkRevList(commitrange)
+	commitrange, err := checkRevList(ctx, commitrange)
 	if err != nil {
 		return nil, fmt.Errorf("validating the commit range: %w", err)
 	}
 
 	cmdArgs := []string{"git", "rev-list", commitrange}
 
-	output, err := command(cmdArgs[1:]...).Output()
+	output, err := command(ctx, cmdArgs[1:]...).Output()
+
+	err = ended(ctx, err)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
 	}
@@ -37,7 +40,7 @@ func Commits(commitrange string) ([]CommitEntry, error) {
 
 	commits := make([]CommitEntry, len(commitHashes))
 	for i, commitHash := range commitHashes {
-		c, err := LogCommit(commitHash)
+		c, err := LogCommit(ctx, commitHash)
 		if err != nil {
 			return commits, err
 		}
@@ -57,12 +60,19 @@ var errRange = errors.New("the commit range does not resolve")
 // what the repository had, so a typo, or a shallow clone whose depth did not
 // reach the range's start, validated the whole history and passed. In a
 // shallow clone the error says what to fetch.
-func checkRevList(commitrange string) (string, error) {
+func checkRevList(ctx context.Context, commitrange string) (string, error) {
 	cmdArgs := []string{"git", "rev-list", commitrange}
 
-	_, err := command(cmdArgs[1:]...).Output()
+	_, err := command(ctx, cmdArgs[1:]...).Output()
+
+	err = ended(ctx, err)
 	if err == nil {
 		return commitrange, nil
+	}
+
+	// A git that was stopped says nothing of the range.
+	if ctx.Err() != nil {
+		return "", fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
 	}
 
 	// The git command that failed is named, and its exit unwraps, as every
@@ -73,12 +83,12 @@ func checkRevList(commitrange string) (string, error) {
 		detail = " (" + strings.TrimSpace(string(exitErr.Stderr)) + ")"
 	}
 
-	if shallowRepository() {
+	if shallowRepository(ctx) {
 		detail += "; the repository is a shallow clone"
 
 		// A typo and an end past the depth look the same from here: both
 		// are not in the clone.
-		switch missing := missingEnds(commitrange); len(missing) {
+		switch missing := missingEnds(ctx, commitrange); len(missing) {
 		case 0:
 		case 1:
 			detail += " and " + missing[0] + " is not in it"
@@ -94,7 +104,7 @@ func checkRevList(commitrange string) (string, error) {
 
 // missingEnds returns the ends of a range (a..b, a...b, or a single revision)
 // that do not name a commit the repository has.
-func missingEnds(commitrange string) []string {
+func missingEnds(ctx context.Context, commitrange string) []string {
 	var missing []string
 
 	for end := range strings.SplitSeq(strings.ReplaceAll(commitrange, "...", ".."), "..") {
@@ -102,7 +112,8 @@ func missingEnds(commitrange string) []string {
 			continue
 		}
 
-		if err := command("rev-parse", "--verify", "--quiet", end+"^{commit}").Run(); err != nil {
+		err := command(ctx, "rev-parse", "--verify", "--quiet", end+"^{commit}").Run()
+		if err != nil {
 			missing = append(missing, end)
 		}
 	}
@@ -112,8 +123,9 @@ func missingEnds(commitrange string) []string {
 
 // shallowRepository reports whether the repository was cloned with a depth,
 // so that its history may not reach a range's start.
-func shallowRepository() bool {
-	output, err := command("rev-parse", "--is-shallow-repository").Output()
+func shallowRepository(ctx context.Context) bool {
+	output, err := command(ctx, "rev-parse", "--is-shallow-repository").Output()
+	err = ended(ctx, err)
 
 	return err == nil && strings.TrimSpace(string(output)) == "true"
 }
@@ -143,11 +155,13 @@ var FieldNames = map[string]string{
 	"%G?": "verification_flag",
 }
 
-func gitVersion() (string, error) {
-	cmd := command("version")
+func gitVersion(ctx context.Context) (string, error) {
+	cmd := command(ctx, "version")
 	cmd.Stderr = os.Stderr
 
 	buf, err := cmd.Output()
+
+	err = ended(ctx, err)
 	if err != nil {
 		return "", fmt.Errorf("git version: %w", err)
 	}
@@ -158,8 +172,8 @@ func gitVersion() (string, error) {
 // https://github.com/vbatts/git-validation/issues/37
 var versionWithExcludes = "1.9.5"
 
-func gitVersionNewerThan(otherV string) (bool, error) {
-	gv, err := gitVersion()
+func gitVersionNewerThan(ctx context.Context, otherV string) (bool, error) {
+	gv, err := gitVersion(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -208,14 +222,19 @@ func versionNumbers(gitVersion string) ([]int, error) {
 
 // Check warns if changes introduce whitespace errors.
 // Returns non-zero if any issues are found.
-func Check(commit string) ([]byte, error) {
-	logs, err := LogUntil(commit)
+func Check(ctx context.Context, commit string) ([]byte, error) {
+	logs, err := LogUntil(ctx, commit)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(logs) == 1 {
-		slog.Debug("skipping the whitespace check of the initial commit, which has no parent", "commit", commit)
+		slog.DebugContext(
+			ctx,
+			"skipping the whitespace check of the initial commit, which has no parent",
+			"commit",
+			commit,
+		)
 
 		return []byte{}, nil
 	}
@@ -228,7 +247,7 @@ func Check(commit string) ([]byte, error) {
 	if excludeEnvList := os.Getenv("GIT_CHECK_EXCLUDE"); excludeEnvList != "" {
 		var gitNewEnough bool
 
-		gitNewEnough, err = gitVersionNewerThan(versionWithExcludes)
+		gitNewEnough, err = gitVersionNewerThan(ctx, versionWithExcludes)
 		if err != nil {
 			return nil, err
 		}
@@ -244,13 +263,15 @@ func Check(commit string) ([]byte, error) {
 		}
 	}
 
-	cmd := command(args...)
+	cmd := command(ctx, args...)
 
 	cmd.Stderr = os.Stderr
 
 	// The output holds what git found when it exits non-zero, which is how
 	// it says there are whitespace errors: both go back to the caller.
 	out, err := cmd.Output()
+
+	err = ended(ctx, err)
 	if err != nil {
 		return out, fmt.Errorf("git log --check %s: %w", commit, err)
 	}
@@ -261,12 +282,14 @@ func Check(commit string) ([]byte, error) {
 // Show returns the diff of a commit.
 //
 // NOTE: This could be expensive for very large commits.
-func Show(commit string) ([]byte, error) {
-	cmd := command("--no-pager", "show", commit)
+func Show(ctx context.Context, commit string) ([]byte, error) {
+	cmd := command(ctx, "--no-pager", "show", commit)
 
 	cmd.Stderr = os.Stderr
 
 	out, err := cmd.Output()
+
+	err = ended(ctx, err)
 	if err != nil {
 		return out, fmt.Errorf("git show %s: %w", commit, err)
 	}
@@ -279,12 +302,14 @@ func Show(commit string) ([]byte, error) {
 type CommitEntry map[string]string
 
 // LogUntil returns the array of oneline commits from initial until the provided commit.
-func LogUntil(commit string) ([]string, error) {
-	cmd := command("--no-pager", "log", "--oneline", "--no-show-signature", commit)
+func LogUntil(ctx context.Context, commit string) ([]string, error) {
+	cmd := command(ctx, "--no-pager", "log", "--oneline", "--no-show-signature", commit)
 
 	cmd.Stderr = os.Stderr
 
 	out, err := cmd.Output()
+
+	err = ended(ctx, err)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", strings.Join(cmd.Args, " "), err)
 	}
@@ -293,15 +318,17 @@ func LogUntil(commit string) ([]string, error) {
 }
 
 // LogCommit assembles the full information on a commit from its commit hash.
-func LogCommit(commit string) (*CommitEntry, error) {
+func LogCommit(ctx context.Context, commit string) (*CommitEntry, error) {
 	c := CommitEntry{}
 
 	for k, v := range FieldNames {
-		cmd := command("--no-pager", "log", "-1", `--pretty=format:`+k+``, commit)
+		cmd := command(ctx, "--no-pager", "log", "-1", `--pretty=format:`+k+``, commit)
 
 		cmd.Stderr = os.Stderr
 
 		out, err := cmd.Output()
+
+		err = ended(ctx, err)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", strings.Join(cmd.Args, " "), err)
 		}
@@ -314,10 +341,12 @@ func LogCommit(commit string) (*CommitEntry, error) {
 }
 
 // FetchHeadCommit returns the hash of FETCH_HEAD.
-func FetchHeadCommit() (string, error) {
+func FetchHeadCommit(ctx context.Context) (string, error) {
 	cmdArgs := []string{"git", "--no-pager", "rev-parse", "--verify", "FETCH_HEAD"}
 
-	output, err := command(cmdArgs[1:]...).Output()
+	output, err := command(ctx, cmdArgs[1:]...).Output()
+
+	err = ended(ctx, err)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
 	}
@@ -326,10 +355,12 @@ func FetchHeadCommit() (string, error) {
 }
 
 // HeadCommit returns the hash of HEAD.
-func HeadCommit() (string, error) {
+func HeadCommit(ctx context.Context) (string, error) {
 	cmdArgs := []string{"git", "--no-pager", "rev-parse", "--verify", "HEAD"}
 
-	output, err := command(cmdArgs[1:]...).Output()
+	output, err := command(ctx, cmdArgs[1:]...).Output()
+
+	err = ended(ctx, err)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
 	}
@@ -337,9 +368,21 @@ func HeadCommit() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// command returns the git command for args, recorded at debug level.
-func command(args ...string) *exec.Cmd {
-	slog.Debug("running git", "cmd", "git "+strings.Join(args, " "))
+// ended is err, or the context's error with it when the context is done: a
+// git that was killed because its context ended says "signal: killed", and
+// the caller asked whether its context ended.
+func ended(ctx context.Context, err error) error {
+	if err == nil || ctx.Err() == nil {
+		return err
+	}
 
-	return exec.Command("git", args...)
+	return fmt.Errorf("%w: %w", ctx.Err(), err)
+}
+
+// command returns the git command for args, recorded at debug level. git is
+// killed when ctx ends.
+func command(ctx context.Context, args ...string) *exec.Cmd {
+	slog.DebugContext(ctx, "running git", "cmd", "git "+strings.Join(args, " "))
+
+	return exec.CommandContext(ctx, "git", args...)
 }

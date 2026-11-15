@@ -147,7 +147,7 @@ func TestContractDCO(t *testing.T) {
 				subject = "Signed-off-by: Ada Lovelace <ada@example.com>"
 			}
 
-			r := dco.ValidateDCO(dco.DcoRule, entry(subject, c.body, parentA))
+			r := dco.ValidateDCO(t.Context(), dco.DcoRule, entry(subject, c.body, parentA))
 			if r.Pass != c.pass {
 				t.Errorf("pass %v (%q), want %v", r.Pass, r.Msg, c.pass)
 			}
@@ -158,7 +158,7 @@ func TestContractDCO(t *testing.T) {
 		})
 	}
 
-	if r := dco.ValidateDCO(dco.DcoRule, entry("Merge branch", "", parentA, parentB)); !r.Pass {
+	if r := dco.ValidateDCO(t.Context(), dco.DcoRule, entry("Merge branch", "", parentA, parentB)); !r.Pass {
 		t.Errorf("an unsigned merge commit: %q, want a pass", r.Msg)
 	}
 }
@@ -210,7 +210,7 @@ func TestContractShortSubject(t *testing.T) {
 		{90, false, "exceeds 90"},
 		{200, false, "exceeds 90"},
 	} {
-		r := shortsubject.ValidateShortSubject(
+		r := shortsubject.ValidateShortSubject(t.Context(),
 			shortsubject.ShortSubjectRule,
 			entry(strings.Repeat("s", c.length), "", parentA),
 		)
@@ -220,7 +220,7 @@ func TestContractShortSubject(t *testing.T) {
 	}
 
 	long := strings.Repeat("s", 200)
-	if r := shortsubject.ValidateShortSubject(
+	if r := shortsubject.ValidateShortSubject(t.Context(),
 		shortsubject.ShortSubjectRule,
 		entry(long, "", parentA, parentB),
 	); !r.Pass {
@@ -247,18 +247,18 @@ func TestContractMessageRegexp(t *testing.T) {
 		{"nothing matches", "fix", "details", false},
 		{"match not at a line start", "see JIRA-12", "", false},
 	} {
-		r := messageregexp.ValidateMessageRegexp(rule, entry(c.subject, c.body, parentA))
+		r := messageregexp.ValidateMessageRegexp(t.Context(), rule, entry(c.subject, c.body, parentA))
 		if r.Pass != c.pass {
 			t.Errorf("%s: pass %v (%q), want %v", c.name, r.Pass, r.Msg, c.pass)
 		}
 	}
 
-	if r := messageregexp.ValidateMessageRegexp(rule, entry("fix", "", parentA, parentB)); !r.Pass {
+	if r := messageregexp.ValidateMessageRegexp(t.Context(), rule, entry("fix", "", parentA, parentB)); !r.Pass {
 		t.Errorf("a merge commit: %q, want a pass", r.Msg)
 	}
 
 	blank := messageregexp.RegexpRule
-	if r := messageregexp.ValidateMessageRegexp(
+	if r := messageregexp.ValidateMessageRegexp(t.Context(),
 		blank,
 		entry("fix", "", parentA),
 	); !r.Pass ||
@@ -278,7 +278,7 @@ func TestContractResultsCount(t *testing.T) {
 
 	rules := validate.FilterRules(validate.RegisteredRules, validate.SanitizeFilters("DCO,short-subject"))
 
-	results := validate.Commit(entry(strings.Repeat("s", 95), "", parentA), rules)
+	results := validate.Commit(t.Context(), entry(strings.Repeat("s", 95), "", parentA), rules)
 	if len(results) != 2 {
 		t.Fatalf("%d results for two rules", len(results))
 	}
@@ -287,12 +287,12 @@ func TestContractResultsCount(t *testing.T) {
 		t.Errorf("pass %d fail %d, want 0 and 2", pass, fail)
 	}
 
-	mixed := validate.Commit(entry("short", "Signed-off-by: A <a@example.com>", parentA), rules)
+	mixed := validate.Commit(t.Context(), entry("short", "Signed-off-by: A <a@example.com>", parentA), rules)
 	if pass, fail := mixed.PassFail(); pass != 2 || fail != 0 {
 		t.Errorf("pass %d fail %d for two passing rules, want 2 and 0", pass, fail)
 	}
 
-	half := validate.Commit(entry("short", "", parentA), rules)
+	half := validate.Commit(t.Context(), entry("short", "", parentA), rules)
 	if pass, fail := half.PassFail(); pass != 1 || fail != 1 {
 		t.Errorf("pass %d fail %d for one of two rules failing, want 1 and 1", pass, fail)
 	}
@@ -344,8 +344,8 @@ func TestContractCommitsToFixCountsCommits(t *testing.T) {
 
 	var results validate.Results
 
-	results = append(results, validate.Commit(bad, rules)...)
-	results = append(results, validate.Commit(good, rules)...)
+	results = append(results, validate.Commit(t.Context(), bad, rules)...)
+	results = append(results, validate.Commit(t.Context(), good, rules)...)
 
 	if n := results.CommitsToFix(); n != 1 {
 		t.Errorf("CommitsToFix %d for one commit failing two rules beside a clean one, want 1", n)
