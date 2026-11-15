@@ -8,6 +8,14 @@ import (
 	"github.com/forkcloser/git-validation/validate"
 )
 
+// The two lengths of a subject, in characters: it must be strictly shorter
+// than limit, and is better kept within preferred. The description and the
+// messages name them too.
+const (
+	limit     = 90
+	preferred = 72
+)
+
 // ShortSubjectRule is the rule being registered.
 var ShortSubjectRule = validate.Rule{
 	Name:        "short-subject",
@@ -34,7 +42,7 @@ func ValidateShortSubject(r validate.Rule, c git.CommitEntry) (vr validate.Resul
 	// them; in bytes, 85 accented characters failed the rule.
 	length := utf8.RuneCountInString(c["subject"])
 
-	if length >= 90 {
+	if length >= limit {
 		vr.Pass = false
 		vr.Msg = "commit subject exceeds 90 characters"
 
@@ -42,7 +50,7 @@ func ValidateShortSubject(r validate.Rule, c git.CommitEntry) (vr validate.Resul
 	}
 
 	vr.Pass = true
-	if length > 72 {
+	if length > preferred {
 		vr.Msg = "commit subject is under 90 characters, but is still more than 72 chars"
 	} else {
 		vr.Msg = "commit subject is 72 characters or less! *yay*"

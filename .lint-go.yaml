@@ -120,8 +120,7 @@ golangci:
             - gochecknoinits # 1
             - revive # 1
         - path: ^rules/shortsubject/shortsubject\.go$
-          linters: # 7 findings
-            - mnd # 2
+          linters: # 5 findings
             - revive # 2
             - gochecknoglobals # 1
             - gochecknoinits # 1
