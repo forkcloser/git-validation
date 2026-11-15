@@ -136,8 +136,5 @@ golangci:
             - paralleltest # 2
             - testpackage # 1
         - path: ^validate/runner\.go$
-          linters: # 11 findings
-            - forbidigo # 7
-            - varnamelen # 2
-            - err113 # 1
+          linters: # 1 findings
             - gocognit # 1
