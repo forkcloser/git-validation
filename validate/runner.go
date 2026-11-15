@@ -47,7 +47,7 @@ func NewRunner(root string, rules []Rule, commitrange string) (runner *Runner, e
 
 		cwd, err = os.Getwd()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("finding the working directory: %w", err)
 		}
 		defer func() {
 			if chdirErr := os.Chdir(cwd); chdirErr != nil {
@@ -56,14 +56,14 @@ func NewRunner(root string, rules []Rule, commitrange string) (runner *Runner, e
 		}()
 
 		if err = os.Chdir(newroot); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("entering %q: %w", newroot, err)
 		}
 
 		commitrange, err = git.FetchHeadCommit()
 		if err != nil {
 			commitrange, err = git.HeadCommit()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("finding a commit to validate from in %q: %w", newroot, err)
 			}
 		}
 
@@ -82,7 +82,7 @@ func NewRunner(root string, rules []Rule, commitrange string) (runner *Runner, e
 func (r *Runner) Run() (err error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return err
+		return fmt.Errorf("finding the working directory: %w", err)
 	}
 	defer func() {
 		if chdirErr := os.Chdir(cwd); chdirErr != nil {
@@ -91,13 +91,13 @@ func (r *Runner) Run() (err error) {
 	}()
 
 	if err = os.Chdir(r.Root); err != nil {
-		return err
+		return fmt.Errorf("entering %q: %w", r.Root, err)
 	}
 
 	// collect the entries
 	c, err := git.Commits(r.CommitRange)
 	if err != nil {
-		return err
+		return fmt.Errorf("listing the commits of %q: %w", r.CommitRange, err)
 	}
 
 	for _, commit := range c {

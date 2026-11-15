@@ -211,6 +211,35 @@ func TestContractDefaultRunOverAHistory(t *testing.T) {
 	}
 }
 
+// TestContractWhitespaceErrorsAreNamed: a commit that adds trailing
+// whitespace fails the dangling-whitespace rule with the command that shows
+// them, and a commit that does not passes it.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
+func TestContractWhitespaceErrorsAreNamed(t *testing.T) {
+	r := newRepo(t)
+
+	clean := r.commit("a", "a\n", "Clean change", true)
+	dirty := r.commit("b", "b \n", "Dirty change", true)
+
+	code, out := r.run(nil, "--run", "dangling-whitespace", "-v")
+	if code != 1 {
+		t.Errorf("a commit with trailing whitespace: exit %d, want 1", code)
+	}
+
+	for _, line := range []string{
+		" * " + dirty + " \"Dirty change\" ... FAIL\n",
+		// The rule names the commit by its whole hash, which the short one starts.
+		"  - FAIL - has whitespace errors. See `git show --check " + dirty,
+		" * " + clean + " \"Clean change\" ... PASS\n",
+		"  - PASS - commit does not have any whitespace errors\n",
+	} {
+		if !strings.Contains(out, line) {
+			t.Errorf("output lacks %q:\n%s", line, out)
+		}
+	}
+}
+
 // TestContractVerboseAndQuiet: -v prints every rule's result under its
 // commit; -q prints nothing for a passing commit and one line per failing
 // rule, the hash and the reason, with -v or without; QUIET in the

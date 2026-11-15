@@ -1,9 +1,16 @@
 package danglingwhitespace
 
 import (
+	"errors"
+	"os/exec"
+
 	"github.com/forkcloser/git-validation/git"
 	"github.com/forkcloser/git-validation/validate"
 )
+
+// whitespaceErrors is the status git log --check exits with when it finds
+// whitespace errors.
+const whitespaceErrors = 2
 
 // DanglingWhitespace is the rule for checking the presence of dangling
 // whitespaces on line endings.
@@ -27,7 +34,11 @@ func ValidateDanglingWhitespace(r validate.Rule, c git.CommitEntry) (vr validate
 	_, err := git.Check(c["commit"])
 	if err != nil {
 		vr.Pass = false
-		if err.Error() == "exit status 2" {
+
+		// git log --check exits 2 when it finds whitespace errors; anything
+		// else is git failing.
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && exit.ExitCode() == whitespaceErrors {
 			vr.Msg = "has whitespace errors. See `git show --check " + c["commit"] + "`."
 		} else {
 			vr.Msg = "errored with: " + err.Error()

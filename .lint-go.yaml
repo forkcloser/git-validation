@@ -90,8 +90,7 @@ golangci:
             - gocognit # 1
             - revive # 1
         - path: ^git/commits\.go$
-          linters: # 37 findings
-            - wrapcheck # 11
+          linters: # 26 findings
             - noctx # 10
             - gosec # 8
             - varnamelen # 3
@@ -137,9 +136,8 @@ golangci:
             - paralleltest # 2
             - testpackage # 1
         - path: ^validate/runner\.go$
-          linters: # 17 findings
+          linters: # 11 findings
             - forbidigo # 7
-            - wrapcheck # 6
             - varnamelen # 2
             - err113 # 1
             - gocognit # 1

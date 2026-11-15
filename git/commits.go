@@ -149,7 +149,7 @@ func gitVersion() (string, error) {
 
 	buf, err := cmd.Output()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("git version: %w", err)
 	}
 
 	return strings.Fields(string(buf))[2], nil
@@ -226,7 +226,9 @@ func Check(commit string) ([]byte, error) {
 	}
 
 	if excludeEnvList := os.Getenv("GIT_CHECK_EXCLUDE"); excludeEnvList != "" {
-		gitNewEnough, err := gitVersionNewerThan(versionWithExcludes)
+		var gitNewEnough bool
+
+		gitNewEnough, err = gitVersionNewerThan(versionWithExcludes)
 		if err != nil {
 			return nil, err
 		}
@@ -246,7 +248,14 @@ func Check(commit string) ([]byte, error) {
 
 	cmd.Stderr = os.Stderr
 
-	return cmd.Output()
+	// The output holds what git found when it exits non-zero, which is how
+	// it says there are whitespace errors: both go back to the caller.
+	out, err := cmd.Output()
+	if err != nil {
+		return out, fmt.Errorf("git log --check %s: %w", commit, err)
+	}
+
+	return out, nil
 }
 
 // Show returns the diff of a commit.
@@ -257,7 +266,12 @@ func Show(commit string) ([]byte, error) {
 
 	cmd.Stderr = os.Stderr
 
-	return cmd.Output()
+	out, err := cmd.Output()
+	if err != nil {
+		return out, fmt.Errorf("git show %s: %w", commit, err)
+	}
+
+	return out, nil
 }
 
 // CommitEntry represents a single commit's information from `git`.
