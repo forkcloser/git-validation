@@ -147,6 +147,27 @@ func TestContractLogCommitIsGitsView(t *testing.T) {
 		)
 	}
 
+	// A message git did not clean keeps its CRLF, and the entry folds it.
+	r.git(
+		"commit",
+		"-q",
+		"--allow-empty",
+		"--cleanup=verbatim",
+		"-m",
+		"Verbatim subject\r\n\r\nline one\r\nline two\r\n",
+	)
+	verbatim := r.git("rev-parse", "HEAD")
+	r.git("reset", "-q", "--hard", second)
+
+	v, err := git.LogCommit(t.Context(), verbatim)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if (*v)["body"] != "line one\nline two" {
+		t.Errorf("a body written with CRLF: %q, want its lines folded to LF", (*v)["body"])
+	}
+
 	r.git("checkout", "-q", "-b", "side", first)
 	side := r.commit("c", []byte("c\n"), "Side subject")
 	r.git("checkout", "-q", "main")
@@ -160,6 +181,89 @@ func TestContractLogCommitIsGitsView(t *testing.T) {
 
 	if parents := strings.Split((*m)["parent"], " "); len(parents) != 2 || parents[0] != second || parents[1] != side {
 		t.Errorf("merge parents %q, want %s then %s", (*m)["parent"], second, side)
+	}
+}
+
+// TestContractASignedCommitIsReadAsWritten: with log.showSignature set, git
+// prints what it found of a commit's signature ahead of the commit. No field
+// of the entry holds that line; the signature is in the fields that are its
+// own.
+//
+//nolint:paralleltest // newRepo enters the repository with t.Chdir and t.Setenv
+func TestContractASignedCommitIsReadAsWritten(t *testing.T) {
+	keygen, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("no ssh-keygen on PATH to make a signing key with")
+	}
+
+	r := newRepo(t)
+	keys := t.TempDir()
+	key := filepath.Join(keys, "key")
+
+	out, err := exec.CommandContext(t.Context(), keygen, "-q", "-t", "ed25519", "-N", "", "-C", "signer", "-f", key).
+		CombinedOutput()
+	if err != nil {
+		t.Fatalf("ssh-keygen: %v\n%s", err, out)
+	}
+
+	public, err := os.ReadFile(key + ".pub")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signers := filepath.Join(keys, "signers")
+	if err = os.WriteFile(signers, []byte("signer@example.com "+string(public)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r.git("config", "gpg.format", "ssh")
+	r.git("config", "user.signingkey", key+".pub")
+	r.git("config", "gpg.ssh.allowedSignersFile", signers)
+	r.git("config", "log.showSignature", "true")
+
+	if err = os.WriteFile(filepath.Join(r.dir, "a"), []byte("a\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r.git("add", "-A")
+	r.git("commit", "-q", "-S", "-m", "A signed subject\n\nA signed body")
+
+	signed := r.git("rev-parse", "HEAD")
+
+	// The premise: git does print the line under this configuration.
+	if shown := r.git("log", "-1", "--pretty=format:%s"); !strings.Contains(shown, "signature") {
+		t.Fatalf("git log prints no signature line ahead of the commit: %q", shown)
+	}
+
+	one, err := git.LogCommit(t.Context(), signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ranged, err := git.Commits(t.Context(), signed)
+	if err != nil || len(ranged) != 1 {
+		t.Fatalf("Commits: %v, %d commits, want one", err, len(ranged))
+	}
+
+	for _, entry := range []git.CommitEntry{*one, ranged[0]} {
+		for field, want := range map[string]string{
+			"commit":            signed,
+			"subject":           "A signed subject",
+			"body":              "A signed body",
+			"refs":              "HEAD -> main",
+			"verification_flag": "G",
+			"signer":            "signer@example.com",
+		} {
+			if entry[field] != want {
+				t.Errorf("%s = %q, want %q", field, entry[field], want)
+			}
+		}
+
+		for field, value := range entry {
+			if strings.Contains(value, "signature") {
+				t.Errorf("%s holds git's signature line: %q", field, value)
+			}
+		}
 	}
 }
 
