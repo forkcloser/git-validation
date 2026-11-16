@@ -110,6 +110,18 @@ vbatts@valse ~/src/vb/git-validation (master) $ GIT_CHECK_EXCLUDE="./vendor:./gi
 
 using the `GIT_CHECK_EXCLUDE` environment variable. Multiple paths should be separated by colon(`:`)
 
+In a shallow clone, the commit the clone was cut at has no parent to compare with, so its
+whitespace cannot be checked. Under `-v` the rule's line says so, and a warning on standard
+error names the commit at every verbosity:
+
+```text
+ * 7652388 "A clean change" ... PASS
+  - SKIP - whitespace not checked: the commit's parents are not in this shallow clone
+```
+
+The commit's own verdict is that of the rules that ran. Give a `--range` the clone holds with
+its parents, or fetch the history (`fetch-depth: 0` with actions/checkout).
+
 ## contributing
 
 When making a change, verify it with:

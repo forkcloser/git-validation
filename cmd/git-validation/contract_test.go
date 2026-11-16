@@ -124,6 +124,15 @@ func (r repo) commit(file, content, message string, signed bool) string {
 func (r repo) run(env []string, args ...string) (int, string) {
 	r.t.Helper()
 
+	code, out, _ := r.runAll(env, args...)
+
+	return code, out
+}
+
+// runAll is run, with what the binary logged to standard error.
+func (r repo) runAll(env []string, args ...string) (code int, stdout, logged string) {
+	r.t.Helper()
+
 	cmd := exec.CommandContext(r.t.Context(), binary, args...)
 	cmd.Dir = r.dir
 
@@ -139,13 +148,13 @@ func (r repo) run(env []string, args ...string) (int, string) {
 
 	switch {
 	case err == nil:
-		return 0, string(out)
+		return 0, string(out), stderr.String()
 	case errors.As(err, &exit):
-		return exit.ExitCode(), string(out)
+		return exit.ExitCode(), string(out), stderr.String()
 	default:
 		r.t.Fatalf("running %s: %v\n%s", binary, err, stderr.String())
 
-		return -1, ""
+		return -1, "", ""
 	}
 }
 
@@ -242,8 +251,7 @@ func TestContractWhitespaceErrorsAreNamed(t *testing.T) {
 
 // TestContractWhitespaceIsEachCommitsOwn: a merge is not failed for the
 // whitespace errors of the commits it brings in, which are not in the
-// range; a first commit is checked as any other; the commit a shallow
-// clone was cut at is not failed for the tree before it.
+// range; a first commit is checked as any other.
 //
 //nolint:paralleltest // newRepo sets the environment with t.Setenv
 func TestContractWhitespaceIsEachCommitsOwn(t *testing.T) {
@@ -282,18 +290,95 @@ func TestContractWhitespaceIsEachCommitsOwn(t *testing.T) {
 	if line := " * " + root + " \"Root with a trailing blank\" ... FAIL\n"; code != 1 || !strings.Contains(out, line) {
 		t.Errorf("a first commit with a trailing blank: exit %d, want 1 and %q:\n%s", code, line, out)
 	}
+}
 
-	// A clone of depth 1, as a CI checks out: its one commit was cut from
-	// its parents, and is not failed for the tree they left it.
-	r.git("checkout", "-q", "main")
+// TestContractWhitespaceNotCheckedInAShallowClone: the commit a shallow
+// clone was cut at cannot have its whitespace checked, and is not said to
+// pass it: the rule's line is SKIP under -v, a warning on standard error
+// names the commit and what to do, at every verbosity, and the exit
+// status is that of the rules that ran; a clone one commit deeper checks
+// its head, and a range it holds with its parents skips nothing.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
+func TestContractWhitespaceNotCheckedInAShallowClone(t *testing.T) {
+	r := newRepo(t)
 
-	last := r.commit("d", "d\n", "A clean change", true)
-	clone := repo{t: t, dir: filepath.Join(t.TempDir(), "clone")}
-	r.git("clone", "-q", "--no-local", "--depth", "1", r.dir, clone.dir)
+	r.commit("a", "a \n", "Root with a trailing blank", true)
+	middle := r.commit("b", "b\n", "A clean change", true)
+	last := r.commit("d", "d\n", "Another clean change", true)
+	full := r.git("rev-parse", "HEAD")
 
-	code, out = clone.run(nil, "--run", "dangling-whitespace", "-v")
-	if line := " * " + last + " \"A clean change\" ... PASS\n"; code != 0 || !strings.Contains(out, line) {
-		t.Errorf("a clone of depth 1 over a tree with trailing blanks: exit %d, want 0 and %q:\n%s", code, line, out)
+	const (
+		skipped = "  - SKIP - whitespace not checked: the commit's parents are not in this shallow clone\n"
+		warning = "whitespace not checked: the commit's parents are not in this shallow clone; " +
+			"fetch the history (actions/checkout fetch-depth: 0, git fetch --unshallow) or give a range it holds"
+	)
+
+	// A clone of depth 1, as a CI checks out.
+	cut := repo{t: t, dir: filepath.Join(t.TempDir(), "clone")}
+	r.git("clone", "-q", "--no-local", "--depth", "1", r.dir, cut.dir)
+
+	commit := " * " + last + " \"Another clean change\" ... PASS\n"
+
+	code, out, logged := cut.runAll(nil, "--run", "dangling-whitespace", "-v")
+	if code != 0 || out != commit+skipped {
+		t.Errorf("depth 1, -v: exit %d and %q, want 0 and %q", code, out, commit+skipped)
+	}
+
+	if !strings.Contains(logged, warning) || !strings.Contains(logged, full) {
+		t.Errorf("depth 1, -v: logged %q, want the warning and the commit %s", logged, full)
+	}
+
+	code, out, logged = cut.runAll(nil, "--run", "dangling-whitespace")
+	if code != 0 || out != commit || !strings.Contains(logged, warning) {
+		t.Errorf("depth 1: exit %d, %q, logged %q; want 0, the commit's line alone and the warning", code, out, logged)
+	}
+
+	code, out, logged = cut.runAll(nil, "--run", "dangling-whitespace", "-q")
+	if code != 0 || out != "" || !strings.Contains(logged, warning) || !strings.Contains(logged, full) {
+		t.Errorf("depth 1, -q: exit %d, %q, logged %q; want 0, nothing and the warning", code, out, logged)
+	}
+
+	// With every rule, the commit's verdict is that of the rules that ran.
+	code, out, _ = cut.runAll(nil, "-v")
+	if code != 0 || !strings.Contains(out, commit) || !strings.Contains(out, skipped) ||
+		strings.Count(out, "  - PASS - ") == 0 {
+		t.Errorf(
+			"depth 1, every rule: exit %d and %q, want 0, the commit passing, one SKIP and the others' PASS",
+			code,
+			out,
+		)
+	}
+
+	// One commit deeper the head has its parent, and is checked. A run with
+	// no range still reaches the commit the clone was cut at, one further
+	// back; a range the clone holds with its parents does not.
+	deeper := repo{t: t, dir: filepath.Join(t.TempDir(), "clone")}
+	r.git("clone", "-q", "--no-local", "--depth", "2", r.dir, deeper.dir)
+
+	checked := commit + "  - PASS - commit does not have any whitespace errors\n"
+	before := " * " + middle + " \"A clean change\" ... PASS\n"
+
+	code, out, logged = deeper.runAll(nil, "--run", "dangling-whitespace", "-v")
+	if code != 0 || out != checked+before+skipped || strings.Count(logged, warning) != 1 {
+		t.Errorf(
+			"depth 2: exit %d, %q, logged %q; want 0, %q and one warning",
+			code,
+			out,
+			logged,
+			checked+before+skipped,
+		)
+	}
+
+	code, out, logged = deeper.runAll(nil, "--run", "dangling-whitespace", "-v", "--range", "HEAD~1..HEAD")
+	if code != 0 || out != checked || logged != "" {
+		t.Errorf(
+			"depth 2, a range it holds: exit %d, %q, logged %q; want 0, %q and nothing logged",
+			code,
+			out,
+			logged,
+			checked,
+		)
 	}
 }
 

@@ -62,18 +62,24 @@ func Commit(ctx context.Context, c git.CommitEntry, rules []Rule) Results {
 type Result struct {
 	CommitEntry git.CommitEntry
 	Pass        bool
-	Msg         string
+	// NotChecked says the rule could not be run on the commit: the result is
+	// neither a pass nor a failure, whatever Pass holds, and Msg says why.
+	NotChecked bool
+	Msg        string
 }
 
 // Results is a set of results. This is type makes it easy for the following function.
 type Results []Result
 
-// PassFail gives a quick over/under of passes and failures of the results in this set.
+// PassFail gives a quick over/under of passes and failures of the results in
+// this set. A result that is not checked is neither.
 func (vr Results) PassFail() (pass, fail int) {
 	for _, res := range vr {
-		if res.Pass {
+		switch {
+		case res.NotChecked:
+		case res.Pass:
 			pass++
-		} else {
+		default:
 			fail++
 		}
 	}
@@ -86,7 +92,7 @@ func (vr Results) CommitsToFix() int {
 	failing := map[string]struct{}{}
 
 	for _, res := range vr {
-		if !res.Pass {
+		if !res.Pass && !res.NotChecked {
 			failing[res.CommitEntry["commit"]] = struct{}{}
 		}
 	}

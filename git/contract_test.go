@@ -416,9 +416,9 @@ func TestContractCheckFindsWhitespaceErrors(t *testing.T) {
 
 // TestContractCheckOfAFirstCommitAndOfACut: a first commit is checked
 // whatever log.showRoot says; the commit a shallow clone was cut at is
-// not a first commit, and answers for nothing, as its own change cannot
-// be told from the tree before it; a clone deep enough to hold the first
-// commit checks it, at the very depth of the history too.
+// not a first commit, and is not checked, which Check says, as its own
+// change cannot be told from the tree before it; a clone deep enough to
+// hold the first commit checks it, at the very depth of the history too.
 //
 //nolint:paralleltest // newRepo sets the environment with t.Setenv, and the test enters each clone
 func TestContractCheckOfAFirstCommitAndOfACut(t *testing.T) {
@@ -451,16 +451,13 @@ func TestContractCheckOfAFirstCommitAndOfACut(t *testing.T) {
 			t.Fatalf("the premise: a clone of depth %s cut after the first commit", depth)
 		}
 
-		if _, err := git.Check(t.Context(), cut); err != nil {
-			t.Errorf(
-				"depth %s, the commit the clone was cut at: %v, want none: the tree before it is not its own",
-				depth,
-				err,
-			)
+		if _, err := git.Check(t.Context(), cut); !errors.Is(err, git.ErrParentsNotHere) {
+			t.Errorf("depth %s, the commit the clone was cut at: %v, want ErrParentsNotHere", depth, err)
 		}
 
-		if _, err := git.Check(t.Context(), head); err != nil {
-			t.Errorf("depth %s, a clean commit: %v", depth, err)
+		// At depth 1 the head is the commit the clone was cut at.
+		if _, err := git.Check(t.Context(), head); err != nil && head != cut {
+			t.Errorf("depth %s, a clean commit with its parent: %v", depth, err)
 		}
 	}
 
