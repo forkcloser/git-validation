@@ -3,7 +3,7 @@
 Fork of https://github.com/vbatts/git-validation (`main`).
 
 - Forked from: [`a8d4555`](https://github.com/vbatts/git-validation/commit/a8d455533459b620fa656bad095b943e70cede9b), committed 2025-04-14
-- Reviewed through: [`a8d4555`](https://github.com/vbatts/git-validation/commit/a8d455533459b620fa656bad095b943e70cede9b), reviewed 2026-10-15
+- Reviewed through: [`a8d4555`](https://github.com/vbatts/git-validation/commit/a8d455533459b620fa656bad095b943e70cede9b), reviewed 2026-11-15
 
 ## Incorporated
 
@@ -27,3 +27,6 @@ Fork of https://github.com/vbatts/git-validation (`main`).
 | A `--run` name no rule has is refused, naming it and listing the rules there are, where it ran nothing and passed; a `message_regexp` value that does not compile is refused before any commit is read, with the regexp package's words, where it panicked on the first commit; the final count is of commits with a failing result, not of results; "using commit range" is logged at debug | https://github.com/forkcloser/git-validation/pull/24 |
 | The short-subject rule counts characters, not bytes, against its limits; a `--range` git cannot resolve is an error naming the range and the failed git command in a repository with its whole history, nothing validated | https://github.com/forkcloser/git-validation/pull/39 |
 | A `--range` git cannot resolve is an error in a shallow clone too, where it used to validate what the clone had from its oldest commit, so a depth of one passed the head commit alone; the error names the end the clone does not have and what to fetch (`fetch-depth: 0`, `git fetch --deepen` or `--unshallow`), and a shallow clone deep enough for the range runs as before | https://github.com/forkcloser/git-validation/pull/47 |
+| `QUIET` in the environment no longer quiets the command; `-q` does | https://github.com/forkcloser/git-validation/pull/81 |
+| Errors from git and from the file system say what was being done when they happened | https://github.com/forkcloser/git-validation/pull/83 |
+| A run can be stopped: on an interrupt the git that is running is killed, no further commit is read, and the error says the run was stopped, where nothing could stop a git that hangs | https://github.com/forkcloser/git-validation/pull/86 |
