@@ -84,6 +84,32 @@ func TestCommandsAreRecordedAtDebug(t *testing.T) {
 	}
 }
 
+// A range costs the same two gits whatever its length: the one that checks
+// it resolves, and one log for every field of every commit.
+func TestCommitsRunsTwoGitsWhateverTheRange(t *testing.T) {
+	newRepository(t, "one", "two", "three", "four", "five")
+
+	for _, revisions := range []string{"HEAD~1..HEAD", "HEAD"} {
+		var records bytes.Buffer
+
+		previous := slog.Default()
+
+		slog.SetDefault(slog.New(slog.NewTextHandler(&records, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+		commits, err := Commits(t.Context(), revisions)
+
+		slog.SetDefault(previous)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if ran := strings.Count(records.String(), `msg="running git"`); ran != 2 {
+			t.Errorf("%s, %d commits: %d gits ran, want 2:\n%s", revisions, len(commits), ran, records.String())
+		}
+	}
+}
+
 // newRepository makes a repository in a temporary directory with one signed-off
 // commit per subject, oldest first, and makes it the working directory. The
 // user's and the system's git configuration stay out of it (no signing, no

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"os/exec"
 	"slices"
@@ -23,32 +24,7 @@ func Commits(ctx context.Context, commitrange string) ([]CommitEntry, error) {
 		return nil, fmt.Errorf("validating the commit range: %w", err)
 	}
 
-	cmdArgs := []string{"git", "rev-list", commitrange}
-
-	output, err := command(ctx, cmdArgs[1:]...).Output()
-
-	err = ended(ctx, err)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", strings.Join(cmdArgs, " "), err)
-	}
-
-	if len(output) == 0 {
-		return nil, nil
-	}
-
-	commitHashes := strings.Split(strings.TrimSpace(string(output)), "\n")
-
-	commits := make([]CommitEntry, len(commitHashes))
-	for i, commitHash := range commitHashes {
-		c, err := LogCommit(ctx, commitHash)
-		if err != nil {
-			return commits, err
-		}
-
-		commits[i] = *c
-	}
-
-	return commits, nil
+	return entries(ctx, commitrange)
 }
 
 // errRange is a --range git cannot resolve: a typo, a ref that is not
@@ -319,25 +295,69 @@ func LogUntil(ctx context.Context, commit string) ([]string, error) {
 
 // LogCommit assembles the full information on a commit from its commit hash.
 func LogCommit(ctx context.Context, commit string) (*CommitEntry, error) {
-	c := CommitEntry{}
-
-	for k, v := range FieldNames {
-		cmd := command(ctx, "--no-pager", "log", "-1", `--pretty=format:`+k+``, commit)
-
-		cmd.Stderr = os.Stderr
-
-		out, err := cmd.Output()
-
-		err = ended(ctx, err)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", strings.Join(cmd.Args, " "), err)
-		}
-
-		commitMessage := strings.ReplaceAll(string(out), "\r\n", "\n")
-		c[v] = strings.TrimSpace(commitMessage)
+	found, err := entries(ctx, "-1", commit)
+	if err != nil {
+		return nil, err
 	}
 
-	return &c, nil
+	if len(found) != 1 {
+		return nil, fmt.Errorf("git log -1 %s: %w: %d", commit, errEntries, len(found))
+	}
+
+	return &found[0], nil
+}
+
+// errEntries is a git log that did not print the commits asked of it, field
+// for field.
+var errEntries = errors.New("git log did not print whole commits")
+
+// entries is the commits git log lists for the revisions, newest first, every
+// field of FieldNames read: one git for all of them. The fields are printed
+// with a NUL between them and between commits, which no field holds, so that
+// a body with any line in it is read whole.
+func entries(ctx context.Context, revisions ...string) ([]CommitEntry, error) {
+	formats := slices.Sorted(maps.Keys(FieldNames))
+
+	// Under log.showSignature git prints what it found of a signature ahead
+	// of each commit, inside the first field.
+	args := append(
+		[]string{"--no-pager", "log", "-z", "--no-show-signature", "--pretty=format:" + strings.Join(formats, "%x00")},
+		revisions...,
+	)
+
+	cmd := command(ctx, args...)
+
+	cmd.Stderr = os.Stderr
+
+	out, err := cmd.Output()
+
+	err = ended(ctx, err)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", strings.Join(cmd.Args, " "), err)
+	}
+
+	if len(out) == 0 {
+		return nil, nil
+	}
+
+	fields := strings.Split(string(out), "\x00")
+	if len(fields)%len(formats) != 0 {
+		return nil, fmt.Errorf("%s: %w: %d fields", strings.Join(cmd.Args, " "), errEntries, len(fields))
+	}
+
+	found := make([]CommitEntry, 0, len(fields)/len(formats))
+
+	for commit := range slices.Chunk(fields, len(formats)) {
+		entry := CommitEntry{}
+
+		for idx, format := range formats {
+			entry[FieldNames[format]] = strings.TrimSpace(strings.ReplaceAll(commit[idx], "\r\n", "\n"))
+		}
+
+		found = append(found, entry)
+	}
+
+	return found, nil
 }
 
 // FetchHeadCommit returns the hash of FETCH_HEAD.
