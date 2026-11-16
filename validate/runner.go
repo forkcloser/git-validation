@@ -108,7 +108,7 @@ func (r *Runner) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("stopped before %s: %w", commit["abbreviated_commit"], err)
 		}
 
-		vr := Commit(ctx, commit, r.Rules)
+		results := Commit(ctx, commit, r.Rules)
 
 		// A rule that was stopped has not judged the commit: what it
 		// returned is the stop, and is not a result.
@@ -116,10 +116,10 @@ func (r *Runner) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("stopped at %s: %w", commit["abbreviated_commit"], err)
 		}
 
-		r.Results = append(r.Results, vr...)
+		r.Results = append(r.Results, results...)
 
 		if r.Report != nil {
-			r.Report(commit, vr)
+			r.Report(commit, results)
 		}
 	}
 
