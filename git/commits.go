@@ -196,29 +196,20 @@ func versionNumbers(gitVersion string) ([]int, error) {
 	return numbers, nil
 }
 
-// Check warns if changes introduce whitespace errors.
-// Returns non-zero if any issues are found.
+// Check runs `git log --check` on the commit alone: the output is what git
+// found, and the error its exit, 2 when there are whitespace errors. A commit
+// with no parent is checked whole. A merge answers for nothing: the commits
+// it brings in are not its own, and git shows no change for a merge. Nor
+// does a commit a shallow clone was cut at: its parents are not here to
+// tell its change from the tree it started from.
 func Check(ctx context.Context, commit string) ([]byte, error) {
-	logs, err := LogUntil(ctx, commit)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
-	if len(logs) == 1 {
-		slog.DebugContext(
-			ctx,
-			"skipping the whitespace check of the initial commit, which has no parent",
-			"commit",
-			commit,
-		)
-
-		return []byte{}, nil
-	}
-
-	args := []string{
-		"--no-pager", "log", "--check",
-		fmt.Sprintf("%s^..%s", commit, commit),
-	}
+	// commit^! is the commit without its parents' histories. commit^..commit
+	// cannot be written for a first commit, and for a merge it is every
+	// commit the second parent brings. With log.showRoot off in the user's
+	// configuration git shows nothing for a first commit.
+	args := []string{"-c", "log.showRoot=true", "--no-pager", "log", "--check", commit + "^!"}
 
 	if excludeEnvList := os.Getenv("GIT_CHECK_EXCLUDE"); excludeEnvList != "" {
 		var gitNewEnough bool
@@ -249,10 +240,41 @@ func Check(ctx context.Context, commit string) ([]byte, error) {
 
 	err = ended(ctx, err)
 	if err != nil {
+		// git shows a commit whose parents are not here as adding the whole
+		// tree, so what it found there is any commit's before it.
+		if cutAt(ctx, commit) {
+			slog.DebugContext(
+				ctx,
+				"skipping the whitespace check of a commit whose parents are not in this shallow clone",
+				"commit", commit,
+			)
+
+			return nil, nil
+		}
+
 		return out, fmt.Errorf("git log --check %s: %w", commit, err)
 	}
 
 	return out, nil
+}
+
+// cutAt reports whether commit is one a shallow clone was cut at: its own
+// object names a parent, and git shows it none. A first commit names none.
+func cutAt(ctx context.Context, commit string) bool {
+	shown, err := command(ctx, "rev-list", "--parents", "--max-count=1", commit).Output()
+	if ended(ctx, err) != nil || len(strings.Fields(string(shown))) != 1 {
+		return false
+	}
+
+	object, err := command(ctx, "cat-file", "commit", commit).Output()
+	if ended(ctx, err) != nil {
+		return false
+	}
+
+	// The headers end at the first empty line; a message may hold anything.
+	headers, _, _ := strings.Cut(string(object), "\n\n")
+
+	return strings.HasPrefix(headers, "parent ") || strings.Contains(headers, "\nparent ")
 }
 
 // Show returns the diff of a commit.

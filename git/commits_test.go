@@ -75,8 +75,7 @@ func TestCommandsAreRecordedAtDebug(t *testing.T) {
 
 	for _, want := range []string{
 		`msg="running git" cmd="git --no-pager rev-parse --verify HEAD"`,
-		`msg="running git" cmd="git --no-pager log --oneline --no-show-signature ` + head + `"`,
-		`msg="skipping the whitespace check of the initial commit, which has no parent" commit=` + head,
+		`msg="running git" cmd="git -c log.showRoot=true --no-pager log --check ` + head + `^!"`,
 	} {
 		if !strings.Contains(records.String(), want) {
 			t.Errorf("no record %s in:\n%s", want, records.String())

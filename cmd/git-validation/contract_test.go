@@ -240,6 +240,63 @@ func TestContractWhitespaceErrorsAreNamed(t *testing.T) {
 	}
 }
 
+// TestContractWhitespaceIsEachCommitsOwn: a merge is not failed for the
+// whitespace errors of the commits it brings in, which are not in the
+// range; a first commit is checked as any other; the commit a shallow
+// clone was cut at is not failed for the tree before it.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv
+func TestContractWhitespaceIsEachCommitsOwn(t *testing.T) {
+	r := newRepo(t)
+
+	root := r.commit("a", "a \n", "Root with a trailing blank", true)
+
+	r.git("checkout", "-q", "-b", "feature")
+
+	work := r.commit("f", "f\n", "Feature work", true)
+
+	r.git("checkout", "-q", "main")
+	r.commit("c", "c \n", "On main, with a trailing blank", true)
+	r.git("checkout", "-q", "feature")
+	r.git("merge", "-q", "--no-ff", "-m", "Merge main into feature", "main")
+
+	merge := r.git("rev-parse", "--short", "HEAD")
+
+	// What the branch adds to main: its own commit, and the merge.
+	code, out := r.run(nil, "--run", "dangling-whitespace", "-v", "--range", "main..feature")
+	if code != 0 {
+		t.Errorf("a branch that merged main, whose own commit is clean: exit %d, want 0:\n%s", code, out)
+	}
+
+	for _, line := range []string{
+		" * " + merge + " \"Merge main into feature\" ... PASS\n",
+		" * " + work + " \"Feature work\" ... PASS\n",
+	} {
+		if !strings.Contains(out, line) {
+			t.Errorf("output lacks %q:\n%s", line, out)
+		}
+	}
+
+	// The whole of main reaches its first commit.
+	code, out = r.run(nil, "--run", "dangling-whitespace", "-v", "--range", "main")
+	if line := " * " + root + " \"Root with a trailing blank\" ... FAIL\n"; code != 1 || !strings.Contains(out, line) {
+		t.Errorf("a first commit with a trailing blank: exit %d, want 1 and %q:\n%s", code, line, out)
+	}
+
+	// A clone of depth 1, as a CI checks out: its one commit was cut from
+	// its parents, and is not failed for the tree they left it.
+	r.git("checkout", "-q", "main")
+
+	last := r.commit("d", "d\n", "A clean change", true)
+	clone := repo{t: t, dir: filepath.Join(t.TempDir(), "clone")}
+	r.git("clone", "-q", "--no-local", "--depth", "1", r.dir, clone.dir)
+
+	code, out = clone.run(nil, "--run", "dangling-whitespace", "-v")
+	if line := " * " + last + " \"A clean change\" ... PASS\n"; code != 0 || !strings.Contains(out, line) {
+		t.Errorf("a clone of depth 1 over a tree with trailing blanks: exit %d, want 0 and %q:\n%s", code, line, out)
+	}
+}
+
 // TestContractVerboseAndQuiet: -v prints every rule's result under its
 // commit; -q prints nothing for a passing commit and one line per failing
 // rule, the hash and the reason, with -v or without; QUIET in the

@@ -335,10 +335,11 @@ func TestContractCommitsListsARange(t *testing.T) {
 }
 
 // TestContractCheckFindsWhitespaceErrors: Check runs `git log --check` on
-// the commit against its parent: a change adding trailing whitespace
-// fails with git's exit status 2, a clean change passes, the root commit
-// is not checked; GIT_CHECK_EXCLUDE, colon-separated, leaves named paths
-// out of the check, empty entries ignored.
+// the commit alone: a change adding trailing whitespace fails with git's
+// exit status 2, a clean change passes, a first commit is checked as any
+// other; a merge answers for none of the commits it brings in, and git
+// shows no change of its own to check; GIT_CHECK_EXCLUDE, colon-separated,
+// leaves named paths out of the check, empty entries ignored.
 func TestContractCheckFindsWhitespaceErrors(t *testing.T) {
 	r := newRepo(t)
 
@@ -352,8 +353,10 @@ func TestContractCheckFindsWhitespaceErrors(t *testing.T) {
 
 	vendored := r.commit(filepath.Join("vendor", "d.txt"), []byte("vendored \n"), "Vendored")
 
-	if _, err := git.Check(t.Context(), root); err != nil {
-		t.Errorf("the root commit: %v, want it skipped", err)
+	var exit *exec.ExitError
+
+	if _, err := git.Check(t.Context(), root); !errors.As(err, &exit) || exit.ExitCode() != 2 {
+		t.Errorf("a first commit adding trailing whitespace: %v, want git's exit status 2", err)
 	}
 
 	if _, err := git.Check(t.Context(), clean); err != nil {
@@ -365,7 +368,6 @@ func TestContractCheckFindsWhitespaceErrors(t *testing.T) {
 		t.Fatal("a commit adding trailing whitespace: no error")
 	}
 
-	var exit *exec.ExitError
 	if !errors.As(err, &exit) || exit.ExitCode() != 2 {
 		t.Errorf("a commit adding trailing whitespace: %v, want git's exit status 2", err)
 	}
@@ -382,5 +384,95 @@ func TestContractCheckFindsWhitespaceErrors(t *testing.T) {
 
 	if _, err := git.Check(t.Context(), dirty); err == nil {
 		t.Error("the dirty commit outside the excluded paths: no error")
+	}
+
+	t.Setenv("GIT_CHECK_EXCLUDE", "")
+
+	// A branch cut before the dirty commits, which merges main into itself:
+	// the merge brings them in, and they are not its own.
+	r.git("checkout", "-q", "-b", "feature", clean)
+	r.commit("e.txt", []byte("feature\n"), "Feature")
+	r.git("merge", "-q", "--no-ff", "--no-edit", "main")
+
+	if _, err := git.Check(t.Context(), r.git("rev-parse", "HEAD")); err != nil {
+		t.Errorf("a merge of commits with trailing whitespace: %v, want none: they are not the merge's", err)
+	}
+
+	// A merge that adds a line of its own: git shows no change for a merge.
+	r.git("checkout", "-q", "-b", "other", clean)
+	r.commit("f.txt", []byte("other\n"), "Other")
+	r.git("merge", "-q", "--no-ff", "--no-commit", "feature")
+
+	evil := r.commit("g.txt", []byte("added by the merge \n"), "Merge with a change of its own")
+
+	if parents := strings.Fields(r.git("log", "-1", "--pretty=format:%P", evil)); len(parents) != 2 {
+		t.Fatalf("the premise: a merge, got parents %v", parents)
+	}
+
+	if _, err := git.Check(t.Context(), evil); err != nil {
+		t.Errorf("a merge that adds trailing whitespace itself: %v; git shows no change for a merge", err)
+	}
+}
+
+// TestContractCheckOfAFirstCommitAndOfACut: a first commit is checked
+// whatever log.showRoot says; the commit a shallow clone was cut at is
+// not a first commit, and answers for nothing, as its own change cannot
+// be told from the tree before it; a clone deep enough to hold the first
+// commit checks it, at the very depth of the history too.
+//
+//nolint:paralleltest // newRepo sets the environment with t.Setenv, and the test enters each clone
+func TestContractCheckOfAFirstCommitAndOfACut(t *testing.T) {
+	r := newRepo(t)
+
+	root := r.commit("a.txt", []byte("a trailing space \n"), "Root")
+	r.commit("b.txt", []byte("b\n"), "B")
+	r.commit("c.txt", []byte("c\n"), "C")
+	head := r.commit("d.txt", []byte("d\n"), "D")
+
+	var exit *exec.ExitError
+
+	r.git("config", "log.showRoot", "false")
+
+	if _, err := git.Check(t.Context(), root); !errors.As(err, &exit) || exit.ExitCode() != 2 {
+		t.Errorf("a first commit adding trailing whitespace, log.showRoot off: %v, want git's exit status 2", err)
+	}
+
+	for _, depth := range []string{"1", "2"} {
+		clone := repo{t: t, dir: filepath.Join(t.TempDir(), "clone")}
+		r.git("clone", "-q", "--no-local", "--depth", depth, r.dir, clone.dir)
+		t.Chdir(clone.dir)
+
+		if shallow := clone.git("rev-parse", "--is-shallow-repository"); shallow != "true" {
+			t.Fatalf("the premise: a shallow clone, got %s", shallow)
+		}
+
+		cut := clone.git("rev-list", "--max-parents=0", "HEAD")
+		if cut == root {
+			t.Fatalf("the premise: a clone of depth %s cut after the first commit", depth)
+		}
+
+		if _, err := git.Check(t.Context(), cut); err != nil {
+			t.Errorf(
+				"depth %s, the commit the clone was cut at: %v, want none: the tree before it is not its own",
+				depth,
+				err,
+			)
+		}
+
+		if _, err := git.Check(t.Context(), head); err != nil {
+			t.Errorf("depth %s, a clean commit: %v", depth, err)
+		}
+	}
+
+	// At the depth of the history git still calls the clone shallow, and
+	// lists the first commit as where it was cut.
+	for _, depth := range []string{"4", "10"} {
+		whole := repo{t: t, dir: filepath.Join(t.TempDir(), "clone")}
+		r.git("clone", "-q", "--no-local", "--depth", depth, r.dir, whole.dir)
+		t.Chdir(whole.dir)
+
+		if _, err := git.Check(t.Context(), root); !errors.As(err, &exit) || exit.ExitCode() != 2 {
+			t.Errorf("depth %s, a clone that holds the first commit: %v, want git's exit status 2", depth, err)
+		}
 	}
 }
