@@ -90,8 +90,7 @@ golangci:
             - gocognit # 1
             - revive # 1
         - path: ^git/commits\.go$
-          linters: # 16 findings
-            - gosec # 8
+          linters: # 8 findings
             - varnamelen # 3
             - gochecknoglobals # 2
             - goconst # 2

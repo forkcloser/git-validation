@@ -384,5 +384,8 @@ func ended(ctx context.Context, err error) error {
 func command(ctx context.Context, args ...string) *exec.Cmd {
 	slog.DebugContext(ctx, "running git", "cmd", "git "+strings.Join(args, " "))
 
+	// #nosec G204 -- the program is git; its arguments are this file's own subcommands, commits git named, and the
+	// range the operator gave, by --range or by their CI's variables (TRAVIS_COMMIT_RANGE, TRAVIS_COMMIT, GITHUB_SHA),
+	// which is theirs to give as it would be to git
 	return exec.CommandContext(ctx, "git", args...)
 }
