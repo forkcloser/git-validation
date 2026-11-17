@@ -3,7 +3,7 @@
 Fork of https://github.com/vbatts/git-validation (`main`).
 
 - Forked from: [`a8d4555`](https://github.com/vbatts/git-validation/commit/a8d455533459b620fa656bad095b943e70cede9b), committed 2025-04-14
-- Reviewed through: [`a8d4555`](https://github.com/vbatts/git-validation/commit/a8d455533459b620fa656bad095b943e70cede9b), reviewed 2026-11-15
+- Reviewed through: [`a8d4555`](https://github.com/vbatts/git-validation/commit/a8d455533459b620fa656bad095b943e70cede9b), reviewed 2026-11-17
 
 ## Incorporated
 
@@ -30,3 +30,6 @@ Fork of https://github.com/vbatts/git-validation (`main`).
 | `QUIET` in the environment no longer quiets the command; `-q` does | https://github.com/forkcloser/git-validation/pull/81 |
 | Errors from git and from the file system say what was being done when they happened | https://github.com/forkcloser/git-validation/pull/83 |
 | A run can be stopped: on an interrupt the git that is running is killed, no further commit is read, and the error says the run was stopped, where nothing could stop a git that hangs | https://github.com/forkcloser/git-validation/pull/86 |
+| A range is read with one `git log`: two git processes for the range, in place of twenty more a commit | https://github.com/forkcloser/git-validation/pull/91 |
+| The dangling-whitespace rule checks each commit by itself (`git log --check X^!`, with `log.showRoot` on), where upstream checks the range `X^..X`: a merge is no longer failed for the whitespace errors of the commits it brings in, which `git show --check` of the merge does not show, and a first commit, which that range cannot name and upstream skipped, is checked | https://github.com/forkcloser/git-validation/pull/92 |
+| In a shallow clone, the commit the clone was cut at has no parent to compare with and cannot have its whitespace checked. Upstream takes it for a first commit, skips its check and passes it; here its whitespace result is neither a pass nor a failure: `SKIP` under `-v`, a warning on standard error at every verbosity, and the commit's line and the exit status are those of the rules that ran | https://github.com/forkcloser/git-validation/pull/94 |
