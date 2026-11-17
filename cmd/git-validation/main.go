@@ -142,16 +142,17 @@ func run(ctx context.Context, flags *cli) error {
 	return nil
 }
 
-// report prints one commit's results: the commit and its verdict, then each
-// failing rule, and each passing one under verbose. Quiet prints nothing for
-// a passing commit and one line per failing rule, the hash and the reason,
+// report prints one commit's results: the commit and its verdict, which is
+// that of the rules that ran, then each failing rule, and under verbose each
+// passing one and each that could not be run. Quiet prints nothing for a
+// passing commit and one line per failing rule, the hash and the reason,
 // whatever verbose says.
 func report(out io.Writer, commit git.CommitEntry, results validate.Results, verbose, quiet bool) {
 	_, fail := results.PassFail()
 
 	if quiet {
 		for _, res := range results {
-			if !res.Pass {
+			if !res.Pass && !res.NotChecked {
 				_, _ = fmt.Fprintf(out, " %s - FAIL - %s\n", commit["abbreviated_commit"], res.Msg)
 			}
 		}
@@ -168,6 +169,10 @@ func report(out io.Writer, commit git.CommitEntry, results validate.Results, ver
 
 	for _, res := range results {
 		switch {
+		case res.NotChecked:
+			if verbose {
+				_, _ = fmt.Fprintf(out, "  - SKIP - %s\n", res.Msg)
+			}
 		case !res.Pass:
 			_, _ = fmt.Fprintf(out, "  - FAIL - %s\n", res.Msg)
 		case verbose:

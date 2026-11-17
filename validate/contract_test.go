@@ -355,3 +355,24 @@ func TestContractCommitsToFixCountsCommits(t *testing.T) {
 		t.Errorf("PassFail counts %d failing results, want 2", fail)
 	}
 }
+
+// TestContractANotCheckedResultIsNeither: a result of a rule that could not
+// be run is no pass and no failure, and its commit is not one to fix for it.
+func TestContractANotCheckedResultIsNeither(t *testing.T) {
+	t.Parallel()
+
+	results := validate.Results{
+		{CommitEntry: git.CommitEntry{"commit": "a"}, Pass: true},
+		{CommitEntry: git.CommitEntry{"commit": "a"}, NotChecked: true},
+		{CommitEntry: git.CommitEntry{"commit": "b"}, NotChecked: true},
+		{CommitEntry: git.CommitEntry{"commit": "c"}},
+	}
+
+	if pass, fail := results.PassFail(); pass != 1 || fail != 1 {
+		t.Errorf("PassFail() = %d, %d, want 1, 1", pass, fail)
+	}
+
+	if toFix := results.CommitsToFix(); toFix != 1 {
+		t.Errorf("CommitsToFix() = %d, want 1", toFix)
+	}
+}

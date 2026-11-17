@@ -196,12 +196,17 @@ func versionNumbers(gitVersion string) ([]int, error) {
 	return numbers, nil
 }
 
+// ErrParentsNotHere is what Check returns for a commit a shallow clone was
+// cut at: its parents are not here to tell its change from the tree it
+// started from, so nothing was checked.
+var ErrParentsNotHere = errors.New("the commit's parents are not in this shallow clone")
+
 // Check runs `git log --check` on the commit alone: the output is what git
 // found, and the error its exit, 2 when there are whitespace errors. A commit
 // with no parent is checked whole. A merge answers for nothing: the commits
-// it brings in are not its own, and git shows no change for a merge. Nor
-// does a commit a shallow clone was cut at: its parents are not here to
-// tell its change from the tree it started from.
+// it brings in are not its own, and git shows no change for a merge. A commit
+// a shallow clone was cut at is not checked, and Check says so with
+// ErrParentsNotHere.
 func Check(ctx context.Context, commit string) ([]byte, error) {
 	var err error
 
@@ -243,13 +248,7 @@ func Check(ctx context.Context, commit string) ([]byte, error) {
 		// git shows a commit whose parents are not here as adding the whole
 		// tree, so what it found there is any commit's before it.
 		if cutAt(ctx, commit) {
-			slog.DebugContext(
-				ctx,
-				"skipping the whitespace check of a commit whose parents are not in this shallow clone",
-				"commit", commit,
-			)
-
-			return nil, nil
+			return nil, ErrParentsNotHere
 		}
 
 		return out, fmt.Errorf("git log --check %s: %w", commit, err)
