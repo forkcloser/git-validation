@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	gitpkg "github.com/forkcloser/git-validation/git"
+	"github.com/forkcloser/git-validation/internal/testchild"
 	"github.com/forkcloser/git-validation/validate"
 )
 
@@ -42,7 +42,7 @@ func newRepo(t *testing.T) (dir string, git func(args ...string) string) {
 	git = func(args ...string) string {
 		t.Helper()
 
-		cmd := exec.CommandContext(t.Context(), "git", args...)
+		cmd := testchild.Command(t, "git", args...)
 		cmd.Dir = dir
 
 		out, err := cmd.Output()

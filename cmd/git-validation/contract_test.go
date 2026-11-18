@@ -12,12 +12,18 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/forkcloser/git-validation/internal/testchild"
 )
 
 // binary is the command built once for every case.
 //
 //nolint:gochecknoglobals // built in TestMain, read by every test
 var binary string
+
+// buildDeadline is what building the command may take.
+const buildDeadline = 5 * time.Minute
 
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "git-validation-contract")
@@ -29,7 +35,12 @@ func TestMain(m *testing.M) {
 
 	binary = filepath.Join(dir, "git-validation"+exeSuffix())
 
-	build := exec.CommandContext(context.Background(), "go", "build", "-o", binary, ".")
+	ctx, cancel := context.WithTimeout(context.Background(), buildDeadline)
+	defer cancel()
+
+	build := exec.CommandContext(ctx, "go", "build", "-o", binary, ".")
+	build.WaitDelay = time.Second
+
 	if out, err := build.CombinedOutput(); err != nil {
 		panic(string(out))
 	}
@@ -81,7 +92,7 @@ func newRepo(t *testing.T) repo {
 func (r repo) git(args ...string) string {
 	r.t.Helper()
 
-	cmd := exec.CommandContext(r.t.Context(), "git", args...)
+	cmd := testchild.Command(r.t, "git", args...)
 	cmd.Dir = r.dir
 
 	var stderr strings.Builder
@@ -133,7 +144,7 @@ func (r repo) run(env []string, args ...string) (int, string) {
 func (r repo) runAll(env []string, args ...string) (code int, stdout, logged string) {
 	r.t.Helper()
 
-	cmd := exec.CommandContext(r.t.Context(), binary, args...)
+	cmd := testchild.Command(r.t, binary, args...)
 	cmd.Dir = r.dir
 
 	cmd.Env = append(os.Environ(), env...)
@@ -477,7 +488,7 @@ func TestContractRangeAndDir(t *testing.T) {
 	}
 
 	elsewhere := t.TempDir()
-	cmd := exec.CommandContext(t.Context(), binary, "--dir", r.dir, "--range", base+"..HEAD")
+	cmd := testchild.Command(t, binary, "--dir", r.dir, "--range", base+"..HEAD")
 	cmd.Dir = elsewhere
 	cmd.Env = os.Environ()
 

@@ -9,10 +9,11 @@ package main_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/forkcloser/git-validation/internal/testchild"
 )
 
 //nolint:paralleltest // newRepo sets the environment with t.Setenv
@@ -48,7 +49,7 @@ func TestContractUnresolvableRangeIsAnError(t *testing.T) {
 	r.commit("a", "a\n", "Root", true)
 	r.commit("b", "b\n", "Change", true)
 
-	cmd := exec.CommandContext(t.Context(), binary, "--range", "nosuchref..HEAD")
+	cmd := testchild.Command(t, binary, "--range", "nosuchref..HEAD")
 	cmd.Dir = r.dir
 	cmd.Env = os.Environ()
 
@@ -86,7 +87,7 @@ func TestContractShallowCloneRefusesARangeOutOfReach(t *testing.T) {
 
 	shallow := shallowClone(t, r.dir, "1")
 
-	cmd := exec.CommandContext(t.Context(), binary, "--dir", shallow, "--range", base+"..HEAD")
+	cmd := testchild.Command(t, binary, "--dir", shallow, "--range", base+"..HEAD")
 	cmd.Dir = shallow
 	cmd.Env = os.Environ()
 
@@ -123,7 +124,7 @@ func TestContractShallowCloneWithTheRangeInReachRuns(t *testing.T) {
 
 	shallow := shallowClone(t, r.dir, "3")
 
-	cmd := exec.CommandContext(t.Context(), binary, "--dir", shallow, "--range", base+"..HEAD")
+	cmd := testchild.Command(t, binary, "--dir", shallow, "--range", base+"..HEAD")
 	cmd.Dir = shallow
 	cmd.Env = os.Environ()
 
@@ -139,7 +140,7 @@ func shallowClone(t *testing.T, dir, depth string) string {
 
 	shallow := filepath.Join(t.TempDir(), "shallow")
 
-	clone := exec.CommandContext(t.Context(), "git", "clone", "-q", "--depth", depth, "file://"+dir, shallow)
+	clone := testchild.Command(t, "git", "clone", "-q", "--depth", depth, "file://"+dir, shallow)
 	if out, err := clone.CombinedOutput(); err != nil {
 		t.Fatalf("shallow clone: %v\n%s", err, out)
 	}
