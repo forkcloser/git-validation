@@ -113,8 +113,9 @@ func SanitizeFilters(filtStr string) (filters []string) {
 // FilterRules takes a set of rules and a list of short names to include, and
 // returns the reduced set.  The comparison is case insensitive.
 //
-// Some `includes` rules have values assigned to them.
-// i.e. -run "dco,message_regexp='^JIRA-[0-9]+ [A-Z].*$'".
+// Some `includes` rules have values assigned to them, everything after the
+// first `=`, quotes included:
+// i.e. -run "dco,message_regexp=^JIRA-[0-9]+ [A-Z].*$".
 func FilterRules(rules []Rule, includes []string) []Rule {
 	ret := []Rule{}
 
