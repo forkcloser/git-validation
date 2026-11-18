@@ -60,6 +60,16 @@ vbatts@valse ~/src/vb/git-validation (master) $ git-validation --run DCO,short-s
  * c10ba9c "Initial commit" ... PASS
 ```
 
+A rule that takes a value is given it after `=`. `message_regexp` takes the regular
+expression every commit message must match:
+
+```shell
+git-validation --run 'DCO,message_regexp=^JIRA-[0-9]+ [A-Z].*$'
+```
+
+The value is everything after the `=`, as it is written: quotes around it would be part of
+the expression, and it cannot hold a comma, which separates the rules.
+
 Verbosity shows each rule's output:
 
 ```shell
