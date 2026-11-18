@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/forkcloser/git-validation/internal/testchild"
 )
 
 // TestCommitEntry reads the commits of a two-commit repository made for it,
@@ -135,7 +137,7 @@ func newRepository(t *testing.T, subjects ...string) {
 	git := func(args ...string) {
 		t.Helper()
 
-		if out, err := exec.CommandContext(t.Context(), "git", args...).CombinedOutput(); err != nil {
+		if out, err := testchild.Command(t, "git", args...).CombinedOutput(); err != nil {
 			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
 		}
 	}

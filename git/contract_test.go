@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/forkcloser/git-validation/git"
+	"github.com/forkcloser/git-validation/internal/testchild"
 )
 
 // repo is a fresh repository the test's process has entered, with a
@@ -54,7 +55,7 @@ func newRepo(t *testing.T) repo {
 func (r repo) git(args ...string) string {
 	r.t.Helper()
 
-	cmd := exec.CommandContext(r.t.Context(), "git", args...)
+	cmd := testchild.Command(r.t, "git", args...)
 
 	var stderr strings.Builder
 
@@ -200,7 +201,7 @@ func TestContractASignedCommitIsReadAsWritten(t *testing.T) {
 	keys := t.TempDir()
 	key := filepath.Join(keys, "key")
 
-	out, err := exec.CommandContext(t.Context(), keygen, "-q", "-t", "ed25519", "-N", "", "-C", "signer", "-f", key).
+	out, err := testchild.Command(t, keygen, "-q", "-t", "ed25519", "-N", "", "-C", "signer", "-f", key).
 		CombinedOutput()
 	if err != nil {
 		t.Fatalf("ssh-keygen: %v\n%s", err, out)
